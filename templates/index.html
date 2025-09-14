@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Batch Video Creator</title>
+    <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Batch Video Creator</h1>
+            <p>Create multiple video variations from your video library</p>
+        </header>
+        
+        <main>
+            <!-- Folder Selection -->
+            <section class="card">
+                <h2><i class="fas fa-folder-open"></i> Select Video Folder</h2>
+                <div class="form-group">
+                    <label for="input-folder-path">Input Folder Path</label>
+                    <input type="text" id="input-folder-path" placeholder="Example: /Users/username/Videos">
+                    <small>Enter the full path to the folder containing your MP4 videos</small>
+                </div>
+                <div class="form-group">
+                    <label for="output-folder-path">Output Folder Path</label>
+                    <input type="text" id="output-folder-path" placeholder="Example: /Users/username/Desktop/outputs">
+                    <small>Enter the full path where you want to save the merged videos</small>
+                </div>
+                <button id="scan-btn"><i class="fas fa-search"></i> Scan Folder</button>
+            </section>
+            
+            <!-- Video List -->
+            <section id="video-list-section" class="card hidden">
+                <h2><i class="fas fa-video"></i> Found Videos</h2>
+                <div id="video-count" class="info"></div>
+                <div id="video-list" class="video-grid"></div>
+            </section>
+            
+            <!-- Configuration -->
+            <section id="config-section" class="card hidden">
+                <h2><i class="fas fa-cog"></i> Configuration</h2>
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label for="video-count">Videos per Output</label>
+                        <input type="number" id="video-count" min="1" max="20" value="5">
+                        <small>Number of videos to merge in each output (1-20)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="video-duration">Video Duration (seconds)</label>
+                        <input type="number" id="video-duration" min="0.1" step="0.1" value="10">
+                        <small>Each video will be cut to this duration (start from 0s)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="output-count">Number of Outputs</label>
+                        <input type="number" id="output-count" min="1" max="10" value="1">
+                        <small>How many merged videos to create (1-10)</small>
+                    </div>
+                </div>
+                <button id="process-btn"><i class="fas fa-play"></i> Start Processing</button>
+            </section>
+            
+            <!-- Progress -->
+            <section id="progress-section" class="card hidden">
+                <h2><i class="fas fa-tasks"></i> Processing Status</h2>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">0%</div>
+                </div>
+                <div id="status-message"></div>
+            </section>
+            
+            <!-- Results -->
+            <section id="results-section" class="card hidden">
+                <h2><i class="fas fa-download"></i> Download Results</h2>
+                <div id="download-links" class="download-grid"></div>
+            </section>
+        </main>
+    </div>
+    
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
