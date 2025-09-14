@@ -367,3 +367,126 @@ button:disabled {
     font-family: 'Courier New', monospace;
     color: var(--text-primary);
 }
+
+/* Tab Navigation Styles */
+.tab-nav {
+    display: flex;
+    margin-bottom: 24px;
+    border-bottom: 1px solid #334155;
+}
+
+.tab-btn {
+    padding: 12px 24px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 0;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.tab-content {
+    position: relative;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* Video-Audio Merger Tab Styles */
+.file-counts {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.file-lists {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.file-list-container h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+    font-size: 1.2rem;
+}
+
+.file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.file-item {
+    background: #334155;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-item i {
+    color: var(--primary);
+    font-size: 20px;
+}
+
+.file-info h4 {
+    margin: 0;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-info p {
+    margin: 2px 0 0 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.progress-fill-va {
+    height: 100%;
+    background: var(--gradient);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text-va {
+    text-align: center;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .tab-nav {
+        flex-direction: column;
+    }
+    
+    .file-lists {
+        grid-template-columns: 1fr;
+    }
+    
+    .file-grid {
+        grid-template-columns: 1fr;
+    }
+}

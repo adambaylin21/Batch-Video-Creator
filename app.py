@@ -8,9 +8,10 @@ import sys
 from video_processor import VideoProcessor
 from config import *
 
-# Add parent directory to path to import merge_videos
+# Add parent directory to path to import merge_videos and merge_video_audio
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from merge_videos import merge_videos_with_trims
+from merge_video_audio import process_video_audio, start_processing_thread
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
@@ -41,6 +42,22 @@ def scan_folder():
         
         videos = video_processor.scan_folder(folder_path)
         return jsonify({'videos': videos})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/scan-audio-folder', methods=['POST'])
+def scan_audio_folder():
+    try:
+        data = request.get_json()
+        if not data or 'folder_path' not in data:
+            return jsonify({'error': 'Missing folder_path'}), 400
+        
+        folder_path = data['folder_path']
+        if not os.path.exists(folder_path):
+            return jsonify({'error': 'Folder does not exist'}), 400
+        
+        audios = video_processor.scan_audio_folder(folder_path)
+        return jsonify({'audios': audios})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -110,6 +127,68 @@ def process_batch():
                 
                 outputs = video_processor.process_batch(
                     folder_path, video_count, video_duration, output_count, progress_callback, output_folder_path
+                )
+                
+                batch_status[batch_id].update({
+                    'status': 'completed',
+                    'progress': 100,
+                    'message': 'Processing completed',
+                    'outputs': outputs
+                })
+            except Exception as e:
+                batch_status[batch_id].update({
+                    'status': 'error',
+                    'progress': 0,
+                    'error': str(e),
+                    'message': f'Error: {str(e)}'
+                })
+        
+        thread = threading.Thread(target=process)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({'batch_id': batch_id, 'message': 'Processing started'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/process-video-audio-batch', methods=['POST'])
+def process_video_audio_batch():
+    try:
+        data = request.get_json()
+        if not data or 'video_folder_path' not in data or 'audio_folder_path' not in data:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        video_folder_path = data['video_folder_path']
+        audio_folder_path = data['audio_folder_path']
+        output_folder_path = data.get('output_folder_path', OUTPUT_FOLDER)
+        
+        # Validate output folder path
+        if not os.path.exists(output_folder_path):
+            os.makedirs(output_folder_path, exist_ok=True)
+        
+        # Create batch ID
+        batch_id = str(uuid.uuid4())
+        
+        # Initialize batch status
+        batch_status[batch_id] = {
+            'status': 'processing',
+            'progress': 0,
+            'outputs': [],
+            'error': None,
+            'output_folder_path': output_folder_path
+        }
+        
+        # Start processing in background
+        def process():
+            try:
+                # Create a callback function to update progress
+                def progress_callback(progress, message=None):
+                    batch_status[batch_id]['progress'] = progress
+                    if message:
+                        batch_status[batch_id]['message'] = message
+                
+                outputs = video_processor.process_video_audio_batch(
+                    video_folder_path, audio_folder_path, output_folder_path, progress_callback
                 )
                 
                 batch_status[batch_id].update({

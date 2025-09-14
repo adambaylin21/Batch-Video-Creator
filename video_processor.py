@@ -18,6 +18,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logging.info(f"Python path after adding parent: {sys.path}")
 
 from merge_videos import merge_videos_with_trims
+from merge_video_audio import process_video_audio, start_processing_thread
 
 class VideoProcessor:
     def __init__(self, temp_folder, output_folder):
@@ -45,6 +46,27 @@ class VideoProcessor:
                 except Exception as e:
                     logging.warning(f"Failed to read {filename}: {e}")
         return videos
+    
+    def scan_audio_folder(self, folder_path):
+        """Scan folder for audio files and return metadata"""
+        audios = []
+        if not os.path.exists(folder_path):
+            raise ValueError(f"Folder does not exist: {folder_path}")
+            
+        for filename in os.listdir(folder_path):
+            if filename.lower().endswith(('.mp3', '.ogg', '.wav')):
+                file_path = os.path.join(folder_path, filename)
+                try:
+                    from moviepy.editor import AudioFileClip
+                    with AudioFileClip(file_path) as clip:
+                        audios.append({
+                            'name': filename,
+                            'path': file_path,
+                            'duration': clip.duration
+                        })
+                except Exception as e:
+                    logging.warning(f"Failed to read audio {filename}: {e}")
+        return audios
     
     def select_videos(self, videos, count):
         """Randomly select videos"""
@@ -146,5 +168,72 @@ class VideoProcessor:
             finally:
                 # Clean up temp folder
                 shutil.rmtree(batch_folder, ignore_errors=True)
+        
+        return outputs
+    
+    def process_video_audio_batch(self, video_folder_path, audio_folder_path, output_folder, progress_callback=None):
+        """Process batch of video-audio merging"""
+        if progress_callback:
+            progress_callback(0, "Scanning for videos and audio files...")
+        
+        # Ensure output folder exists
+        os.makedirs(output_folder, exist_ok=True)
+        
+        # Scan all videos and audio files
+        all_videos = self.scan_folder(video_folder_path)
+        all_audios = self.scan_audio_folder(audio_folder_path)
+        
+        if not all_videos:
+            raise ValueError("No videos found in the specified folder")
+        
+        if not all_audios:
+            raise ValueError("No audio files found in the specified folder")
+        
+        outputs = []
+        total_videos = len(all_videos)
+        
+        for i, video in enumerate(all_videos):
+            # Calculate overall progress
+            overall_progress = (i / total_videos) * 100
+            
+            if progress_callback:
+                progress_callback(overall_progress, f"Processing video {i+1} of {total_videos}: {video['name']}...")
+            
+            # Select random audio
+            import random
+            selected_audio = random.choice(all_audios)
+            
+            if progress_callback:
+                progress_callback(overall_progress, f"Selected audio: {selected_audio['name']}...")
+            
+            # Create unique job ID
+            job_id = f"va_{uuid.uuid4()}"
+            
+            # Create processing status dictionary
+            processing_status = {}
+            processing_status[job_id] = {
+                'status': 'processing',
+                'progress': 0,
+                'error': None
+            }
+            
+            try:
+                # Process video with audio
+                output_path = process_video_audio(
+                    job_id, video['path'], selected_audio['path'], output_folder, processing_status
+                )
+                
+                if progress_callback:
+                    progress_callback(overall_progress, f"Completed: {video['name']} with {selected_audio['name']}")
+                
+                # Add output filename to results
+                output_filename = os.path.basename(output_path)
+                outputs.append(output_filename)
+                
+            except Exception as e:
+                logging.error(f"Error processing {video['name']} with {selected_audio['name']}: {e}")
+                if progress_callback:
+                    progress_callback(overall_progress, f"Error processing {video['name']}: {str(e)}")
+                continue
         
         return outputs

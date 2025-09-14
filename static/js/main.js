@@ -1,8 +1,15 @@
 const API_BASE = 'http://localhost:5001';
 let currentBatchId = null;
+let currentVABatchId = null;
 let statusInterval = null;
+let vaStatusInterval = null;
 
 // DOM Elements
+// Tab elements
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabPanes = document.querySelectorAll('.tab-pane');
+
+// Batch Creator elements
 const inputFolderPathInput = document.getElementById('input-folder-path');
 const outputFolderPathInput = document.getElementById('output-folder-path');
 const scanBtn = document.getElementById('scan-btn');
@@ -21,9 +28,51 @@ const statusMessage = document.getElementById('status-message');
 const resultsSection = document.getElementById('results-section');
 const downloadLinks = document.getElementById('download-links');
 
+// Video-Audio Merger elements
+const videoFolderPathInput = document.getElementById('video-folder-path');
+const audioFolderPathInput = document.getElementById('audio-folder-path');
+const outputFolderPathInputVA = document.getElementById('output-folder-path-va');
+const scanVABtn = document.getElementById('scan-va-btn');
+const vaFileListSection = document.getElementById('va-file-list-section');
+const videoCountVA = document.getElementById('video-count-va');
+const audioCountVA = document.getElementById('audio-count-va');
+const videoListVA = document.getElementById('video-list-va');
+const audioListVA = document.getElementById('audio-list-va');
+const processVABtn = document.getElementById('process-va-btn');
+const vaProgressSection = document.getElementById('va-progress-section');
+const vaProgressFill = document.querySelector('.progress-fill-va');
+const vaProgressText = document.querySelector('.progress-text-va');
+const vaStatusMessage = document.getElementById('va-status-message');
+const vaResultsSection = document.getElementById('va-results-section');
+const vaDownloadLinks = document.getElementById('va-download-links');
+
 // Event Listeners
+// Tab switching
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tabId = btn.getAttribute('data-tab');
+        
+        // Update active tab button
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update active tab pane
+        tabPanes.forEach(pane => {
+            pane.classList.remove('active');
+            if (pane.id === tabId) {
+                pane.classList.add('active');
+            }
+        });
+    });
+});
+
+// Batch Creator event listeners
 scanBtn.addEventListener('click', scanFolder);
 processBtn.addEventListener('click', startProcessing);
+
+// Video-Audio Merger event listeners
+scanVABtn.addEventListener('click', scanVAFolders);
+processVABtn.addEventListener('click', startVAProcessing);
 
 // Functions
 async function browseInputFolder() {
@@ -563,4 +612,209 @@ function showResults(outputs) {
     `).join('');
     
     resultsSection.classList.remove('hidden');
+}
+
+// Video-Audio Merger Functions
+async function scanVAFolders() {
+    const videoFolderPath = videoFolderPathInput.value.trim();
+    const audioFolderPath = audioFolderPathInput.value.trim();
+    
+    if (!videoFolderPath) {
+        alert('Please enter a video folder path');
+        return;
+    }
+    
+    if (!audioFolderPath) {
+        alert('Please enter an audio folder path');
+        return;
+    }
+    
+    scanVABtn.disabled = true;
+    scanVABtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+    
+    try {
+        // Scan video folder
+        const videoResponse = await fetch(`${API_BASE}/api/scan-folder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ folder_path: videoFolderPath }),
+        });
+        
+        // Scan audio folder
+        const audioResponse = await fetch(`${API_BASE}/api/scan-audio-folder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ folder_path: audioFolderPath }),
+        });
+        
+        const videoData = await videoResponse.json();
+        const audioData = await audioResponse.json();
+        
+        if (videoResponse.ok && audioResponse.ok) {
+            displayVAFiles(videoData.videos, audioData.audios);
+            showVAProcessSection();
+        } else {
+            alert('Error: ' + (videoData.error || audioData.error));
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+    } finally {
+        scanVABtn.disabled = false;
+        scanVABtn.innerHTML = '<i class="fas fa-search"></i> Scan Folders';
+    }
+}
+
+function displayVAFiles(videos, audios) {
+    videoCountVA.textContent = `Found ${videos.length} videos`;
+    audioCountVA.textContent = `Found ${audios.length} audio files`;
+    
+    videoListVA.innerHTML = videos.map(video => `
+        <div class="file-item">
+            <i class="fas fa-file-video"></i>
+            <div class="file-info">
+                <h4>${video.name}</h4>
+                <p>Duration: ${formatDuration(video.duration)}</p>
+            </div>
+        </div>
+    `).join('');
+    
+    audioListVA.innerHTML = audios.map(audio => `
+        <div class="file-item">
+            <i class="fas fa-file-audio"></i>
+            <div class="file-info">
+                <h4>${audio.name}</h4>
+                <p>Duration: ${formatDuration(audio.duration)}</p>
+            </div>
+        </div>
+    `).join('');
+    
+    vaFileListSection.classList.remove('hidden');
+}
+
+function showVAProcessSection() {
+    // Show the process button
+    processVABtn.style.display = 'block';
+}
+
+async function startVAProcessing() {
+    const videoFolderPath = videoFolderPathInput.value.trim();
+    const audioFolderPath = audioFolderPathInput.value.trim();
+    const outputFolderPath = outputFolderPathInputVA.value.trim();
+    
+    if (!videoFolderPath) {
+        alert('Please select a video folder first');
+        return;
+    }
+    
+    if (!audioFolderPath) {
+        alert('Please select an audio folder first');
+        return;
+    }
+    
+    if (!outputFolderPath) {
+        alert('Please select an output folder first');
+        return;
+    }
+    
+    processVABtn.disabled = true;
+    processVABtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    showVAProgressSection();
+    updateVAProgress(0, 'Starting processing...');
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/process-video-audio-batch`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                video_folder_path: videoFolderPath,
+                audio_folder_path: audioFolderPath,
+                output_folder_path: outputFolderPath,
+            }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentVABatchId = data.batch_id;
+            pollVAStatus();
+        } else {
+            alert('Error: ' + data.error);
+            hideVAProgressSection();
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+        hideVAProgressSection();
+    } finally {
+        processVABtn.disabled = false;
+        processVABtn.innerHTML = '<i class="fas fa-play"></i> Start Processing';
+    }
+}
+
+function showVAProgressSection() {
+    vaProgressSection.classList.remove('hidden');
+    vaResultsSection.classList.add('hidden');
+}
+
+function hideVAProgressSection() {
+    vaProgressSection.classList.add('hidden');
+}
+
+function updateVAProgress(percent, message) {
+    vaProgressFill.style.width = `${percent}%`;
+    vaProgressText.textContent = `${percent}%`;
+    vaStatusMessage.textContent = message;
+}
+
+async function pollVAStatus() {
+    if (vaStatusInterval) {
+        clearInterval(vaStatusInterval);
+    }
+    
+    vaStatusInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/status/${currentVABatchId}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                updateVAProgress(data.progress || 0, data.message || data.status);
+                
+                if (data.status === 'completed') {
+                    clearInterval(vaStatusInterval);
+                    showVAResults(data.outputs);
+                } else if (data.status === 'error') {
+                    clearInterval(vaStatusInterval);
+                    alert('Processing error: ' + data.error);
+                    hideVAProgressSection();
+                }
+            } else {
+                clearInterval(vaStatusInterval);
+                alert('Status error: ' + data.error);
+                hideVAProgressSection();
+            }
+        } catch (error) {
+            clearInterval(vaStatusInterval);
+            alert('Network error: ' + error.message);
+            hideVAProgressSection();
+        }
+    }, 2000);
+}
+
+function showVAResults(outputs) {
+    vaDownloadLinks.innerHTML = outputs.map(filename => `
+        <div class="download-item">
+            <a href="${API_BASE}/api/download/${currentVABatchId}/${filename}" download>
+                <i class="fas fa-download"></i>
+                ${filename}
+            </a>
+        </div>
+    `).join('');
+    
+    vaResultsSection.classList.remove('hidden');
 }

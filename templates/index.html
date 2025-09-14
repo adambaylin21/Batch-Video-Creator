@@ -16,8 +16,18 @@
         </header>
         
         <main>
-            <!-- Folder Selection -->
-            <section class="card">
+            <!-- Tab Navigation -->
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="batch-creator">Batch Video Creator</button>
+                <button class="tab-btn" data-tab="video-audio-merger">Video-Audio Merger</button>
+            </div>
+            
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Batch Creator Tab -->
+                <div id="batch-creator" class="tab-pane active">
+                    <!-- Folder Selection -->
+                    <section class="card">
                 <h2><i class="fas fa-folder-open"></i> Select Video Folder</h2>
                 <div class="form-group">
                     <label for="input-folder-path">Input Folder Path</label>
@@ -79,6 +89,70 @@
                 <h2><i class="fas fa-download"></i> Download Results</h2>
                 <div id="download-links" class="download-grid"></div>
             </section>
+                </div>
+                
+                <!-- Video-Audio Merger Tab -->
+                <div id="video-audio-merger" class="tab-pane">
+                    <!-- Folder Selection -->
+                    <section class="card">
+                        <h2><i class="fas fa-folder-open"></i> Select Folders</h2>
+                        <div class="form-group">
+                            <label for="video-folder-path">Video Folder Path</label>
+                            <input type="text" id="video-folder-path" placeholder="Example: /Users/username/Videos">
+                            <small>Enter the full path to the folder containing your MP4 videos</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="audio-folder-path">Audio Folder Path</label>
+                            <input type="text" id="audio-folder-path" placeholder="Example: /Users/username/Music">
+                            <small>Enter the full path to the folder containing your MP3/OGG audio files</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="output-folder-path-va">Output Folder Path</label>
+                            <input type="text" id="output-folder-path-va" placeholder="Example: /Users/username/Desktop/outputs">
+                            <small>Enter the full path where you want to save the merged videos</small>
+                        </div>
+                        <button id="scan-va-btn"><i class="fas fa-search"></i> Scan Folders</button>
+                    </section>
+                    
+                    <!-- File Lists -->
+                    <section id="va-file-list-section" class="card hidden">
+                        <h2><i class="fas fa-file"></i> Found Files</h2>
+                        <div class="file-counts">
+                            <div id="video-count-va" class="info"></div>
+                            <div id="audio-count-va" class="info"></div>
+                        </div>
+                        <div class="file-lists">
+                            <div class="file-list-container">
+                                <h3>Video Files</h3>
+                                <div id="video-list-va" class="file-grid"></div>
+                            </div>
+                            <div class="file-list-container">
+                                <h3>Audio Files</h3>
+                                <div id="audio-list-va" class="file-grid"></div>
+                            </div>
+                        </div>
+                        <button id="process-va-btn"><i class="fas fa-play"></i> Start Processing</button>
+                    </section>
+                    
+                    <!-- Progress -->
+                    <section id="va-progress-section" class="card hidden">
+                        <h2><i class="fas fa-tasks"></i> Processing Status</h2>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill-va"></div>
+                            </div>
+                            <div class="progress-text-va">0%</div>
+                        </div>
+                        <div id="va-status-message"></div>
+                    </section>
+                    
+                    <!-- Results -->
+                    <section id="va-results-section" class="card hidden">
+                        <h2><i class="fas fa-download"></i> Download Results</h2>
+                        <div id="va-download-links" class="download-grid"></div>
+                    </section>
+                </div>
+            </div>
         </main>
     </div>
     

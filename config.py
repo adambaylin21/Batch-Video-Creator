@@ -15,6 +15,7 @@ MAX_OUTPUT_COUNT = 10
 TEMP_FOLDER = 'temp'
 OUTPUT_FOLDER = 'outputs'
 ALLOWED_EXTENSIONS = {'mp4'}
+ALLOWED_AUDIO_EXTENSIONS = {'mp3', 'ogg', 'wav'}
 
 # Video Processing
 VIDEO_CODEC = 'libx264'
