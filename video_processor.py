@@ -74,7 +74,7 @@ class VideoProcessor:
             return videos
         return random.sample(videos, count)
     
-    def process_batch(self, folder_path, video_count, video_duration, output_count, progress_callback=None, output_folder=None):
+    def process_batch(self, folder_path, video_count, video_duration, output_count, progress_callback=None, output_folder=None, video_trim_mode='fixed'):
         """Process batch of videos"""
         if progress_callback:
             progress_callback(0, "Scanning for videos...")
@@ -132,9 +132,23 @@ class VideoProcessor:
                     shutil.copy2(video['path'], temp_path)
                 
                 files.append(temp_filename)
-                # Set trim parameters: start from 0, end at video_duration or video duration (whichever is smaller)
-                end_time = min(video_duration, video['duration'])
-                trims[temp_filename] = {'start': 0, 'end': end_time}
+                
+                # Set trim parameters based on trim mode
+                if video_trim_mode == 'fixed':
+                    # Fixed mode: start from 0, end at video_duration or video duration (whichever is smaller)
+                    end_time = min(video_duration, video['duration'])
+                    trims[temp_filename] = {'start': 0, 'end': end_time}
+                else:  # random mode
+                    # Random mode: randomly select start position
+                    if video['duration'] <= video_duration:
+                        # Video is shorter than requested duration, use the whole video
+                        trims[temp_filename] = {'start': 0, 'end': video['duration']}
+                    else:
+                        # Video is longer than requested duration, randomly select start position
+                        max_start_time = video['duration'] - video_duration
+                        start_time = random.uniform(0, max_start_time)
+                        end_time = start_time + video_duration
+                        trims[temp_filename] = {'start': start_time, 'end': end_time}
             
             # Merge videos
             final_output_path = os.path.join(output_folder, f"output_{i+1}_{uuid.uuid4()}.mp4")
@@ -171,7 +185,7 @@ class VideoProcessor:
         
         return outputs
     
-    def process_video_audio_batch(self, video_folder_path, audio_folder_path, output_folder, progress_callback=None):
+    def process_video_audio_batch(self, video_folder_path, audio_folder_path, output_folder, progress_callback=None, audio_trim_mode='fixed', audio_selection_mode='unique'):
         """Process batch of video-audio merging"""
         if progress_callback:
             progress_callback(0, "Scanning for videos and audio files...")
@@ -192,6 +206,14 @@ class VideoProcessor:
         outputs = []
         total_videos = len(all_videos)
         
+        # Handle audio selection based on the selected mode
+        if audio_selection_mode == 'unique':
+            # Create a copy of the audio list to avoid modifying the original
+            available_audios = all_audios.copy()
+        else:
+            # For random mode, we'll use the full list for each selection
+            available_audios = all_audios
+        
         for i, video in enumerate(all_videos):
             # Calculate overall progress
             overall_progress = (i / total_videos) * 100
@@ -200,8 +222,18 @@ class VideoProcessor:
                 progress_callback(overall_progress, f"Processing video {i+1} of {total_videos}: {video['name']}...")
             
             # Select random audio
-            import random
-            selected_audio = random.choice(all_audios)
+            if audio_selection_mode == 'unique':
+                # If we've used all available audios, reset the list
+                if not available_audios:
+                    available_audios = all_audios.copy()
+                
+                # Select a random audio from the available list
+                selected_audio = random.choice(available_audios)
+                # Remove the selected audio from the available list to ensure it's not reused immediately
+                available_audios.remove(selected_audio)
+            else:
+                # For random mode, just select from all audios
+                selected_audio = random.choice(all_audios)
             
             if progress_callback:
                 progress_callback(overall_progress, f"Selected audio: {selected_audio['name']}...")
@@ -220,7 +252,7 @@ class VideoProcessor:
             try:
                 # Process video with audio
                 output_path = process_video_audio(
-                    job_id, video['path'], selected_audio['path'], output_folder, processing_status
+                    job_id, video['path'], selected_audio['path'], output_folder, processing_status, audio_trim_mode
                 )
                 
                 if progress_callback:

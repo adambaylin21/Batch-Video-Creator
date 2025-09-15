@@ -2,6 +2,7 @@ import os
 import uuid
 import threading
 import time
+import random
 from werkzeug.utils import secure_filename
 from moviepy.editor import VideoFileClip, AudioFileClip
 
@@ -72,7 +73,7 @@ def validate_and_upload_batch(videos, audios, upload_folder, batch_id):
     
     return batch_jobs
 
-def process_video_audio(job_id, video_path, audio_path, output_folder, processing_status):
+def process_video_audio(job_id, video_path, audio_path, output_folder, processing_status, audio_trim_mode='fixed'):
     """
     Process single video+audio pair, update status, return output_path.
     Raises Exception on errors.
@@ -96,8 +97,29 @@ def process_video_audio(job_id, video_path, audio_path, output_folder, processin
         
         # Trim audio to match video duration
         if audio_clip.duration > video_duration:
-            audio_clip = audio_clip.subclip(0, video_duration)
-            print(f"Trimmed audio to: {audio_clip.duration} seconds")
+            if audio_trim_mode == 'random':
+                # Calculate random start position
+                max_start_time = audio_clip.duration - video_duration
+                start_time = random.uniform(0, max_start_time)
+                end_time = start_time + video_duration
+                audio_clip = audio_clip.subclip(start_time, end_time)
+                print(f"Random audio trim: {start_time:.2f}s to {end_time:.2f}s")
+            else:
+                # Default behavior (fixed mode)
+                audio_clip = audio_clip.subclip(0, video_duration)
+                print(f"Fixed audio trim: 0s to {video_duration}s")
+        elif audio_clip.duration < video_duration:
+            # Handle case where audio is shorter than video
+            if audio_trim_mode == 'random':
+                # For random mode with short audio, we could loop the audio
+                # For now, we'll just use the entire audio and let moviepy handle it
+                print(f"Audio is shorter than video. Using entire audio: {audio_clip.duration}s")
+            else:
+                # Fixed mode - use entire audio
+                print(f"Audio is shorter than video. Using entire audio: {audio_clip.duration}s")
+        else:
+            # Audio and video durations are equal, no trimming needed
+            print(f"Audio and video durations are equal: {audio_clip.duration}s")
         
         # Set trimmed audio to video
         final_video = video_clip.set_audio(audio_clip)

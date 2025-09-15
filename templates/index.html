@@ -54,14 +54,22 @@
                 <h2><i class="fas fa-cog"></i> Configuration</h2>
                 <div class="config-grid">
                     <div class="form-group">
-                        <label for="video-count">Videos per Output</label>
-                        <input type="number" id="video-count" min="1" max="20" value="5">
+                        <label for="videos-per-output">Videos per Output</label>
+                        <input type="number" id="videos-per-output" min="1" max="20" value="5">
                         <small>Number of videos to merge in each output (1-20)</small>
                     </div>
                     <div class="form-group">
                         <label for="video-duration">Video Duration (seconds)</label>
                         <input type="number" id="video-duration" min="0.1" step="0.1" value="10">
-                        <small>Each video will be cut to this duration (start from 0s)</small>
+                        <small id="video-duration-description">Each video will be cut to this duration (start from 0s)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="video-trim-mode">Trim Mode</label>
+                        <select id="video-trim-mode" class="form-select">
+                            <option value="fixed">Fixed Mode (start from 0s)</option>
+                            <option value="random">Random Mode (random start position)</option>
+                        </select>
+                        <small>Select how videos should be trimmed</small>
                     </div>
                     <div class="form-group">
                         <label for="output-count">Number of Outputs</label>
@@ -117,6 +125,22 @@
                     <!-- File Lists -->
                     <section id="va-file-list-section" class="card hidden">
                         <h2><i class="fas fa-file"></i> Found Files</h2>
+                        <div class="form-group">
+                            <label for="audio-trim-mode">Audio Trim Mode</label>
+                            <select id="audio-trim-mode" class="form-select">
+                                <option value="fixed">Fixed Mode (start from 0s)</option>
+                                <option value="random">Random Mode (random start position)</option>
+                            </select>
+                            <small>Select how audio should be trimmed when merged with videos</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="audio-selection-mode">Audio Selection Mode</label>
+                            <select id="audio-selection-mode" class="form-select">
+                                <option value="unique">Unique Audio (different audio for each video)</option>
+                                <option value="random">Random Audio (may repeat audio files)</option>
+                            </select>
+                            <small>Select how audio files should be assigned to videos</small>
+                        </div>
                         <div class="file-counts">
                             <div id="video-count-va" class="info"></div>
                             <div id="audio-count-va" class="info"></div>

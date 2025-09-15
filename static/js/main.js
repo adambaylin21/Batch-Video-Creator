@@ -17,7 +17,7 @@ const videoListSection = document.getElementById('video-list-section');
 const videoCount = document.getElementById('video-count');
 const videoList = document.getElementById('video-list');
 const configSection = document.getElementById('config-section');
-const videoCountInput = document.getElementById('video-count');
+const videoCountInput = document.getElementById('videos-per-output');
 const videoDurationInput = document.getElementById('video-duration');
 const outputCountInput = document.getElementById('output-count');
 const processBtn = document.getElementById('process-btn');
@@ -27,6 +27,8 @@ const progressText = document.querySelector('.progress-text');
 const statusMessage = document.getElementById('status-message');
 const resultsSection = document.getElementById('results-section');
 const downloadLinks = document.getElementById('download-links');
+const videoTrimModeSelect = document.getElementById('video-trim-mode');
+const videoDurationDescription = document.getElementById('video-duration-description');
 
 // Video-Audio Merger elements
 const videoFolderPathInput = document.getElementById('video-folder-path');
@@ -45,6 +47,8 @@ const vaProgressText = document.querySelector('.progress-text-va');
 const vaStatusMessage = document.getElementById('va-status-message');
 const vaResultsSection = document.getElementById('va-results-section');
 const vaDownloadLinks = document.getElementById('va-download-links');
+const audioTrimModeSelect = document.getElementById('audio-trim-mode');
+const audioSelectionModeSelect = document.getElementById('audio-selection-mode');
 
 // Event Listeners
 // Tab switching
@@ -69,6 +73,7 @@ tabBtns.forEach(btn => {
 // Batch Creator event listeners
 scanBtn.addEventListener('click', scanFolder);
 processBtn.addEventListener('click', startProcessing);
+videoTrimModeSelect.addEventListener('change', updateVideoDurationDescription);
 
 // Video-Audio Merger event listeners
 scanVABtn.addEventListener('click', scanVAFolders);
@@ -496,11 +501,21 @@ function showConfigSection() {
     configSection.classList.remove('hidden');
 }
 
+function updateVideoDurationDescription() {
+    const mode = videoTrimModeSelect.value;
+    if (mode === 'fixed') {
+        videoDurationDescription.textContent = 'Each video will be cut to this duration (start from 0s)';
+    } else {
+        videoDurationDescription.textContent = 'Each video will be cut to this duration (random start position)';
+    }
+}
+
 async function startProcessing() {
     const inputFolderPath = inputFolderPathInput.value.trim();
     const outputFolderPath = outputFolderPathInput.value.trim();
     const videoCount = parseInt(videoCountInput.value);
     const videoDuration = parseFloat(videoDurationInput.value);
+    const videoTrimMode = videoTrimModeSelect.value;
     const outputCount = parseInt(outputCountInput.value);
     
     if (!inputFolderPath) {
@@ -530,6 +545,7 @@ async function startProcessing() {
                 output_folder_path: outputFolderPath,
                 video_count: videoCount,
                 video_duration: videoDuration,
+                video_trim_mode: videoTrimMode,
                 output_count: outputCount,
             }),
         });
@@ -704,6 +720,8 @@ async function startVAProcessing() {
     const videoFolderPath = videoFolderPathInput.value.trim();
     const audioFolderPath = audioFolderPathInput.value.trim();
     const outputFolderPath = outputFolderPathInputVA.value.trim();
+    const audioTrimMode = audioTrimModeSelect.value;
+    const audioSelectionMode = audioSelectionModeSelect.value;
     
     if (!videoFolderPath) {
         alert('Please select a video folder first');
@@ -736,6 +754,8 @@ async function startVAProcessing() {
                 video_folder_path: videoFolderPath,
                 audio_folder_path: audioFolderPath,
                 output_folder_path: outputFolderPath,
+                audio_trim_mode: audioTrimMode,
+                audio_selection_mode: audioSelectionMode,
             }),
         });
         
@@ -818,3 +838,8 @@ function showVAResults(outputs) {
     
     vaResultsSection.classList.remove('hidden');
 }
+
+// Initialize video duration description on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateVideoDurationDescription();
+});

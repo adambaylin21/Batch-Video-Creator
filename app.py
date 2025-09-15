@@ -88,6 +88,13 @@ def process_batch():
         else:
             video_duration = float(video_duration)
             
+        # Add video_trim_mode parameter with default value 'fixed'
+        video_trim_mode = data.get('video_trim_mode', 'fixed')
+        
+        # Validate video_trim_mode value
+        if video_trim_mode not in ['fixed', 'random']:
+            return jsonify({'error': 'video_trim_mode must be either "fixed" or "random"'}), 400
+            
         output_count = data.get('output_count')
         if output_count is None:
             output_count = DEFAULT_OUTPUT_COUNT
@@ -126,7 +133,7 @@ def process_batch():
                         batch_status[batch_id]['message'] = message
                 
                 outputs = video_processor.process_batch(
-                    folder_path, video_count, video_duration, output_count, progress_callback, output_folder_path
+                    folder_path, video_count, video_duration, output_count, progress_callback, output_folder_path, video_trim_mode
                 )
                 
                 batch_status[batch_id].update({
@@ -162,6 +169,20 @@ def process_video_audio_batch():
         audio_folder_path = data['audio_folder_path']
         output_folder_path = data.get('output_folder_path', OUTPUT_FOLDER)
         
+        # Add audio_trim_mode parameter with default value 'fixed'
+        audio_trim_mode = data.get('audio_trim_mode', 'fixed')
+        
+        # Validate audio_trim_mode value
+        if audio_trim_mode not in ['fixed', 'random']:
+            return jsonify({'error': 'audio_trim_mode must be either "fixed" or "random"'}), 400
+        
+        # Add audio_selection_mode parameter with default value 'unique'
+        audio_selection_mode = data.get('audio_selection_mode', 'unique')
+        
+        # Validate audio_selection_mode value
+        if audio_selection_mode not in ['unique', 'random']:
+            return jsonify({'error': 'audio_selection_mode must be either "unique" or "random"'}), 400
+        
         # Validate output folder path
         if not os.path.exists(output_folder_path):
             os.makedirs(output_folder_path, exist_ok=True)
@@ -188,7 +209,7 @@ def process_video_audio_batch():
                         batch_status[batch_id]['message'] = message
                 
                 outputs = video_processor.process_video_audio_batch(
-                    video_folder_path, audio_folder_path, output_folder_path, progress_callback
+                    video_folder_path, audio_folder_path, output_folder_path, progress_callback, audio_trim_mode, audio_selection_mode
                 )
                 
                 batch_status[batch_id].update({
