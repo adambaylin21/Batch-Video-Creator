@@ -27,6 +27,20 @@ ALLOWED_EXTENSIONS = {'mp4'}
 # Create cache folder if it doesn't exist
 os.makedirs(VIDEO_CACHE_FOLDER, exist_ok=True)
 
+# GPU acceleration check
+def is_gpu_acceleration_available():
+    """Check if GPU acceleration is available."""
+    if not ENABLE_GPU_ACCELERATION:
+        return False
+    
+    try:
+        import subprocess
+        result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True)
+        return GPU_CODEC in result.stdout
+    except Exception as e:
+        logging.warning(f"Error checking GPU acceleration availability: {e}")
+        return False
+
 # Cache cleanup function
 def cleanup_old_cache_files():
     """Remove cache files older than CLEANUP_CACHE_DAYS."""
@@ -134,17 +148,37 @@ def normalize_video(input_path, output_path, trim_info=None):
                     crf = 18  # Lower CRF = higher quality, larger file
                     bitrate = '4000k'
                 
-                # Write normalized video without audio to improve performance
-                clip.write_videofile(
-                    output_path,
-                    codec=VIDEO_CODEC,
-                    preset=VIDEO_PRESET,
-                    audio_codec=None,  # Disable audio processing
-                    bitrate=bitrate,
-                    verbose=False,
-                    logger=None,
-                    threads=MAX_WORKERS
-                )
+                # Determine codec based on GPU availability
+                use_gpu = is_gpu_acceleration_available()
+                codec = GPU_CODEC if use_gpu else FALLBACK_CPU_CODEC
+                
+                # Set encoding parameters based on GPU availability
+                if use_gpu:
+                    # GPU-specific parameters
+                    encoding_params = {
+                        'codec': codec,
+                        'preset': GPU_ENCODING_PRESET,
+                        'audio_codec': None,  # Disable audio processing
+                        'bitrate': GPU_BITRATE,
+                        'verbose': False,
+                        'logger': None
+                    }
+                    logging.info(f"Using GPU acceleration with codec: {codec}")
+                else:
+                    # CPU-specific parameters
+                    encoding_params = {
+                        'codec': codec,
+                        'preset': VIDEO_PRESET,
+                        'audio_codec': None,  # Disable audio processing
+                        'bitrate': bitrate,
+                        'verbose': False,
+                        'logger': None,
+                        'threads': MAX_WORKERS
+                    }
+                    logging.info(f"Using CPU-based encoding with codec: {codec}")
+                
+                # Write normalized video with selected parameters
+                clip.write_videofile(**encoding_params)
                 
                 return True
         except Exception as clip_error:
@@ -346,17 +380,37 @@ def merge_videos_with_trims(files, trims, upload_folder, output_folder):
                 crf = 18  # Lower CRF = higher quality, larger file
                 bitrate = '4000k'
             
-            # Write final video with optimized settings
-            final_clip.write_videofile(
-                output_path,
-                codec=VIDEO_CODEC,
-                preset=VIDEO_PRESET,
-                audio_codec=None,  # Skip audio processing
-                bitrate=bitrate,
-                verbose=False,
-                logger=None,
-                threads=MAX_WORKERS
-            )
+            # Determine codec based on GPU availability
+            use_gpu = is_gpu_acceleration_available()
+            codec = GPU_CODEC if use_gpu else FALLBACK_CPU_CODEC
+            
+            # Set encoding parameters based on GPU availability
+            if use_gpu:
+                # GPU-specific parameters
+                encoding_params = {
+                    'codec': codec,
+                    'preset': GPU_ENCODING_PRESET,
+                    'audio_codec': None,  # Skip audio processing
+                    'bitrate': GPU_BITRATE,
+                    'verbose': False,
+                    'logger': None
+                }
+                logging.info(f"Using GPU acceleration for final merge with codec: {codec}")
+            else:
+                # CPU-specific parameters
+                encoding_params = {
+                    'codec': codec,
+                    'preset': VIDEO_PRESET,
+                    'audio_codec': None,  # Skip audio processing
+                    'bitrate': bitrate,
+                    'verbose': False,
+                    'logger': None,
+                    'threads': MAX_WORKERS
+                }
+                logging.info(f"Using CPU-based encoding for final merge with codec: {codec}")
+            
+            # Write final video with selected parameters
+            final_clip.write_videofile(**encoding_params)
             
             # Close clips to free memory
             for clip in clips:

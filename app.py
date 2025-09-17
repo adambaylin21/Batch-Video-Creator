@@ -423,6 +423,10 @@ def get_system_info():
                     fp = os.path.join(dirpath, f)
                     cache_size += os.path.getsize(fp)
         
+        # Get GPU information
+        from merge_videos import is_gpu_acceleration_available
+        gpu_available = is_gpu_acceleration_available()
+        
         return jsonify({
             'cpu_percent': cpu_percent,
             'memory_percent': memory.percent,
@@ -434,7 +438,11 @@ def get_system_info():
             'cache_size': cache_size,
             'cache_enabled': ENABLE_CACHING,
             'max_workers': MAX_WORKERS,
-            'video_quality': VIDEO_QUALITY
+            'video_quality': VIDEO_QUALITY,
+            'gpu_acceleration_available': gpu_available,
+            'gpu_acceleration_enabled': ENABLE_GPU_ACCELERATION,
+            'gpu_codec': GPU_CODEC,
+            'cpu_codec': FALLBACK_CPU_CODEC
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -448,7 +456,7 @@ def update_settings():
             return jsonify({'error': 'No data provided'}), 400
         
         # Update settings
-        global VIDEO_QUALITY, ENABLE_CACHING, MAX_WORKERS
+        global VIDEO_QUALITY, ENABLE_CACHING, MAX_WORKERS, ENABLE_GPU_ACCELERATION
         
         if 'video_quality' in data and data['video_quality'] in ['low', 'medium', 'high']:
             VIDEO_QUALITY = data['video_quality']
@@ -458,6 +466,9 @@ def update_settings():
             
         if 'max_workers' in data and isinstance(data['max_workers'], int):
             MAX_WORKERS = max(1, min(16, data['max_workers']))
+            
+        if 'enable_gpu_acceleration' in data and isinstance(data['enable_gpu_acceleration'], bool):
+            ENABLE_GPU_ACCELERATION = data['enable_gpu_acceleration']
         
         return jsonify({
             'success': True,
@@ -465,9 +476,73 @@ def update_settings():
             'settings': {
                 'video_quality': VIDEO_QUALITY,
                 'enable_caching': ENABLE_CACHING,
-                'max_workers': MAX_WORKERS
+                'max_workers': MAX_WORKERS,
+                'enable_gpu_acceleration': ENABLE_GPU_ACCELERATION
             }
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/gpu-info', methods=['GET'])
+def get_gpu_info():
+    """Get GPU information for monitoring."""
+    try:
+        from merge_videos import is_gpu_acceleration_available
+        
+        return jsonify({
+            'gpu_acceleration_available': is_gpu_acceleration_available(),
+            'gpu_acceleration_enabled': ENABLE_GPU_ACCELERATION,
+            'gpu_codec': GPU_CODEC,
+            'cpu_codec': FALLBACK_CPU_CODEC
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/toggle-gpu', methods=['POST'])
+def toggle_gpu():
+    """Toggle GPU acceleration on/off."""
+    try:
+        global ENABLE_GPU_ACCELERATION
+        
+        data = request.get_json()
+        if data and 'enable_gpu' in data:
+            ENABLE_GPU_ACCELERATION = bool(data['enable_gpu'])
+            
+        return jsonify({
+            'success': True,
+            'message': f'GPU acceleration {"enabled" if ENABLE_GPU_ACCELERATION else "disabled"}',
+            'gpu_acceleration_enabled': ENABLE_GPU_ACCELERATION
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/set-quality-profile', methods=['POST'])
+def set_quality_profile():
+    """Set quality profile for balancing performance and quality."""
+    try:
+        global VIDEO_PRESET, CRF_VALUE, TARGET_HEIGHT, TARGET_FPS
+        
+        data = request.get_json()
+        if data and 'profile' in data and data['profile'] in QUALITY_PROFILES:
+            profile = QUALITY_PROFILES[data['profile']]
+            VIDEO_PRESET = profile['preset']
+            CRF_VALUE = profile['crf']
+            TARGET_HEIGHT = profile['height']
+            TARGET_FPS = profile['fps']
+            
+            return jsonify({
+                'success': True,
+                'message': f'Quality profile set to {data["profile"]}',
+                'profile': data['profile'],
+                'settings': {
+                    'preset': VIDEO_PRESET,
+                    'crf': CRF_VALUE,
+                    'height': TARGET_HEIGHT,
+                    'fps': TARGET_FPS
+                }
+            })
+        else:
+            return jsonify({'error': 'Invalid profile'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -510,6 +585,18 @@ def get_logs():
         logger.info(f"Target Height: {TARGET_HEIGHT}")
         logger.info(f"Video Bitrate: {VIDEO_BITRATE}")
         logger.info(f"CRF Value: {CRF_VALUE}")
+        logger.info(f"GPU Acceleration Enabled: {ENABLE_GPU_ACCELERATION}")
+        logger.info(f"GPU Codec: {GPU_CODEC}")
+        logger.info(f"CPU Codec: {FALLBACK_CPU_CODEC}")
+        
+        # Check GPU availability
+        from merge_videos import is_gpu_acceleration_available
+        gpu_available = is_gpu_acceleration_available()
+        logger.info(f"GPU Acceleration Available: {gpu_available}")
+        if gpu_available:
+            logger.info("GPU acceleration is available and will be used if enabled")
+        else:
+            logger.info("GPU acceleration is not available, will use CPU-based encoding")
         
         # Remove the handler to prevent duplicate logs in future requests
         logger.removeHandler(file_handler)

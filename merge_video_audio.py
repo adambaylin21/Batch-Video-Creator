@@ -3,8 +3,11 @@ import uuid
 import threading
 import time
 import random
+import subprocess
+import logging
 from werkzeug.utils import secure_filename
 from moviepy.editor import VideoFileClip, AudioFileClip
+from config import *
 
 ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'webm'}
 ALLOWED_AUDIO_EXTENSIONS = {'mp3', 'ogg'}
@@ -14,6 +17,18 @@ def allowed_video_file(filename):
 
 def allowed_audio_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
+
+def is_gpu_acceleration_available():
+    """Check if GPU acceleration is available."""
+    if not ENABLE_GPU_ACCELERATION:
+        return False
+    
+    try:
+        result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True)
+        return GPU_CODEC in result.stdout
+    except Exception as e:
+        logging.warning(f"Error checking GPU acceleration availability: {e}")
+        return False
 
 def validate_and_upload_single(video_file, audio_file, upload_folder, job_id):
     """
@@ -132,8 +147,36 @@ def process_video_audio(job_id, video_path, audio_path, output_folder, processin
         output_filename = f"merged_{job_id}.mp4"
         output_path = os.path.join(output_folder, output_filename)
         
-        # Export the final video
-        final_video.write_videofile(output_path, codec='libx264', audio_codec='aac', verbose=False, logger=None)
+        # Determine codec based on GPU availability
+        use_gpu = is_gpu_acceleration_available()
+        codec = GPU_CODEC if use_gpu else FALLBACK_CPU_CODEC
+        
+        # Set encoding parameters based on GPU availability
+        if use_gpu:
+            # GPU-specific parameters
+            encoding_params = {
+                'codec': codec,
+                'audio_codec': 'aac',
+                'preset': GPU_ENCODING_PRESET,
+                'bitrate': GPU_BITRATE,
+                'verbose': False,
+                'logger': None
+            }
+            logging.info(f"Using GPU acceleration with codec: {codec}")
+        else:
+            # CPU-specific parameters
+            encoding_params = {
+                'codec': codec,
+                'audio_codec': 'aac',
+                'bitrate': VIDEO_BITRATE,
+                'verbose': False,
+                'logger': None,
+                'threads': MAX_WORKERS
+            }
+            logging.info(f"Using CPU-based encoding with codec: {codec}")
+        
+        # Export the final video with selected parameters
+        final_video.write_videofile(**encoding_params)
         
         if job_id in processing_status:
             processing_status[job_id]['progress'] = 100
@@ -285,15 +328,36 @@ def merge_video_with_voice(video_path, audio_path, output_folder, progress_callb
         output_filename = f"voice_added_{uuid.uuid4()}.mp4"
         output_path = os.path.join(output_folder, output_filename)
         
-        # Export the final video
-        final_video.write_videofile(
-            output_path,
-            codec='libx264',
-            audio_codec='aac',
-            verbose=False,
-            logger=None,
-            threads=4  # Use multiple threads for faster processing
-        )
+        # Determine codec based on GPU availability
+        use_gpu = is_gpu_acceleration_available()
+        codec = GPU_CODEC if use_gpu else FALLBACK_CPU_CODEC
+        
+        # Set encoding parameters based on GPU availability
+        if use_gpu:
+            # GPU-specific parameters
+            encoding_params = {
+                'codec': codec,
+                'audio_codec': 'aac',
+                'preset': GPU_ENCODING_PRESET,
+                'bitrate': GPU_BITRATE,
+                'verbose': False,
+                'logger': None
+            }
+            logging.info(f"Using GPU acceleration for voice merge with codec: {codec}")
+        else:
+            # CPU-specific parameters
+            encoding_params = {
+                'codec': codec,
+                'audio_codec': 'aac',
+                'bitrate': VIDEO_BITRATE,
+                'verbose': False,
+                'logger': None,
+                'threads': MAX_WORKERS
+            }
+            logging.info(f"Using CPU-based encoding for voice merge with codec: {codec}")
+        
+        # Export the final video with selected parameters
+        final_video.write_videofile(**encoding_params)
         
         if progress_callback:
             progress_callback(90, "Finalizing...")

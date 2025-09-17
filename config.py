@@ -33,3 +33,37 @@ CLEANUP_CACHE_DAYS = 7  # Clean up cache files older than this many days
 VIDEO_BITRATE = '2000k'  # Target bitrate for output videos
 VIDEO_QUALITY = 'medium'  # Options: 'low', 'medium', 'high'
 CRF_VALUE = 23  # Constant Rate Factor (lower = better quality, higher = smaller file)
+
+# GPU Acceleration Settings
+ENABLE_GPU_ACCELERATION = True  # Enable/disable GPU acceleration
+GPU_CODEC = 'h264_nvenc'  # GPU-based codec for NVIDIA
+FALLBACK_CPU_CODEC = 'libx264'  # Fallback to CPU-based codec when GPU not available
+GPU_ENCODING_PRESET = 'fast'  # Encoding preset for GPU
+GPU_RATE_CONTROL = 'cbr'  # Rate control method for GPU
+GPU_BITRATE = '2000k'  # Target bitrate for GPU encoding
+
+# Performance Optimization Settings
+MAX_WORKERS = min(16, (os.cpu_count() or 1) + 4)  # Increased thread pool size
+FFMPEG_BUFFER_SIZE = '2M'  # Buffer size for FFmpeg processing
+
+# Quality Profiles for performance/quality balance
+QUALITY_PROFILES = {
+    'fastest': {
+        'preset': 'ultrafast',
+        'crf': 28,
+        'height': 360,
+        'fps': 24
+    },
+    'balanced': {
+        'preset': 'veryfast',
+        'crf': 26,
+        'height': 480,
+        'fps': 24
+    },
+    'quality': {
+        'preset': 'fast',
+        'crf': 23,
+        'height': 720,
+        'fps': 30
+    }
+}

@@ -4,3 +4,8 @@ moviepy==1.0.3
 Pillow==10.4.0
 Werkzeug==3.0.3
 psutil==5.9.8
+
+# Note: FFmpeg with GPU acceleration support (h264_nvenc) is required for GPU acceleration
+# On Ubuntu/Debian: sudo apt install ffmpeg
+# On macOS: brew install ffmpeg
+# On Windows: Download from https://ffmpeg.org/download.html
