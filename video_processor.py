@@ -269,3 +269,29 @@ class VideoProcessor:
                 continue
         
         return outputs
+    
+    def process_voice_adder(self, video_path, audio_path, output_folder, progress_callback=None, original_audio_volume=30):
+        """Process video with voice audio addition"""
+        if progress_callback:
+            progress_callback(0, "Loading video and audio files...")
+        
+        # Ensure output folder exists
+        os.makedirs(output_folder, exist_ok=True)
+        
+        # Import here to avoid issues if module not available
+        from merge_video_audio import merge_video_with_voice
+        
+        try:
+            # Process video with voice audio
+            output_path = merge_video_with_voice(
+                video_path, audio_path, output_folder, progress_callback, original_audio_volume
+            )
+            
+            if progress_callback:
+                progress_callback(100, "Processing completed successfully!")
+            
+            return output_path
+            
+        except Exception as e:
+            logging.error(f"Error processing video with voice: {e}")
+            raise

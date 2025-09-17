@@ -20,6 +20,7 @@
             <div class="tab-nav">
                 <button class="tab-btn active" data-tab="batch-creator">Batch Video Creator</button>
                 <button class="tab-btn" data-tab="video-audio-merger">Video-Audio Merger</button>
+                <button class="tab-btn" data-tab="voice-adder">Voice Adder</button>
             </div>
             
             <!-- Tab Content -->
@@ -174,6 +175,71 @@
                     <section id="va-results-section" class="card hidden">
                         <h2><i class="fas fa-download"></i> Download Results</h2>
                         <div id="va-download-links" class="download-grid"></div>
+                    </section>
+                </div>
+                
+                <!-- Voice Adder Tab -->
+                <div id="voice-adder" class="tab-pane">
+                    <!-- File Selection -->
+                    <section class="card">
+                        <h2><i class="fas fa-microphone"></i> Select Files</h2>
+                        <div class="form-group">
+                            <label for="voice-video-file">Video File</label>
+                            <input type="file" id="voice-video-file" accept="video/mp4">
+                            <small>Select a MP4 video file</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="voice-audio-file">Voice Audio File</label>
+                            <input type="file" id="voice-audio-file" accept="audio/mp3,audio/ogg,audio/wav">
+                            <small>Select a voice audio file (MP3, OGG, or WAV)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="original-audio-volume">Original Audio Volume</label>
+                            <div class="volume-control">
+                                <input type="range" id="original-audio-volume" min="0" max="100" value="30">
+                                <span id="volume-value">30%</span>
+                            </div>
+                            <small>Adjust the volume of the original video audio (0-100%)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="output-folder-path-voice">Output Folder Path</label>
+                            <input type="text" id="output-folder-path-voice" placeholder="Example: /Users/username/Desktop/outputs">
+                            <small>Enter the full path where you want to save the output video</small>
+                        </div>
+                        <button id="process-voice-btn"><i class="fas fa-play"></i> Process Video</button>
+                    </section>
+                    
+                    <!-- File Info -->
+                    <section id="voice-file-info-section" class="card hidden">
+                        <h2><i class="fas fa-info-circle"></i> File Information</h2>
+                        <div class="file-info-container">
+                            <div class="file-info-item">
+                                <h3>Video File</h3>
+                                <div id="video-file-info" class="file-details"></div>
+                            </div>
+                            <div class="file-info-item">
+                                <h3>Voice Audio File</h3>
+                                <div id="audio-file-info" class="file-details"></div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- Progress -->
+                    <section id="voice-progress-section" class="card hidden">
+                        <h2><i class="fas fa-tasks"></i> Processing Status</h2>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill-voice"></div>
+                            </div>
+                            <div class="progress-text-voice">0%</div>
+                        </div>
+                        <div id="voice-status-message"></div>
+                    </section>
+                    
+                    <!-- Results -->
+                    <section id="voice-results-section" class="card hidden">
+                        <h2><i class="fas fa-download"></i> Download Result</h2>
+                        <div id="voice-download-link" class="download-container"></div>
                     </section>
                 </div>
             </div>

@@ -477,6 +477,107 @@ button:disabled {
     font-weight: 500;
 }
 
+/* Voice Adder Tab Styles */
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.volume-control input[type="range"] {
+    flex: 1;
+    height: 8px;
+    background: #334155;
+    border-radius: 4px;
+    outline: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--gradient);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--gradient);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+#volume-value {
+    min-width: 50px;
+    text-align: center;
+    font-weight: 500;
+    color: var(--primary);
+}
+
+.file-info-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.file-info-item h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+    font-size: 1.2rem;
+}
+
+.file-details {
+    background: #334155;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.file-info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.file-info-row:last-child {
+    margin-bottom: 0;
+}
+
+.file-info-label {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.file-info-value {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.download-container {
+    background: #334155;
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+}
+
+.progress-fill-voice {
+    height: 100%;
+    background: var(--gradient);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text-voice {
+    text-align: center;
+    font-weight: 500;
+}
+
 @media (max-width: 768px) {
     .tab-nav {
         flex-direction: column;
@@ -488,5 +589,19 @@ button:disabled {
     
     .file-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .file-info-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .volume-control {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    
+    #volume-value {
+        text-align: center;
     }
 }

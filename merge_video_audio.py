@@ -199,3 +199,133 @@ def start_processing_thread(job_id, video_path, audio_path, output_folder, proce
     cleanup_starter = threading.Thread(target=start_cleanup)
     cleanup_starter.daemon = True
     cleanup_starter.start()
+
+def merge_video_with_voice(video_path, audio_path, output_folder, progress_callback=None, original_audio_volume=30):
+    """
+    Merge video with voice audio, adjusting original video audio volume and trimming video to match audio duration.
+    Returns output_path.
+    Raises Exception on errors.
+    """
+    try:
+        if progress_callback:
+            progress_callback(10, "Loading video and audio files...")
+        
+        # Load video and audio clips
+        video_clip = VideoFileClip(video_path)
+        voice_audio_clip = AudioFileClip(audio_path)
+        
+        if progress_callback:
+            progress_callback(20, "Processing video and audio...")
+        
+        # Get durations
+        video_duration = video_clip.duration
+        voice_duration = voice_audio_clip.duration
+        print(f"Video duration: {video_duration} seconds")
+        print(f"Voice audio duration: {voice_duration} seconds")
+        
+        # Trim video to match voice audio duration
+        if video_duration > voice_duration:
+            # Video is longer than voice audio, trim video
+            final_duration = voice_duration
+            video_clip = video_clip.subclip(0, final_duration)
+            print(f"Trimmed video to: {final_duration} seconds")
+        elif video_duration < voice_duration:
+            # Video is shorter than voice audio, trim voice audio
+            voice_audio_clip = voice_audio_clip.subclip(0, video_duration)
+            print(f"Trimmed voice audio to: {video_duration} seconds")
+            final_duration = video_duration
+        else:
+            # Durations are equal, no trimming needed
+            final_duration = video_duration
+            print(f"Video and voice audio durations are equal: {final_duration} seconds")
+        
+        if progress_callback:
+            progress_callback(40, "Adjusting audio volumes...")
+        
+        # Get original audio from video if it exists
+        original_audio = video_clip.audio
+        
+        # Adjust original audio volume
+        if original_audio:
+            # Convert volume percentage to multiplier (e.g., 30% -> 0.3)
+            volume_multiplier = original_audio_volume / 100.0
+            original_audio = original_audio.volumex(volume_multiplier)
+            print(f"Adjusted original audio volume to: {original_audio_volume}%")
+        else:
+            print("No original audio found in video")
+        
+        if progress_callback:
+            progress_callback(60, "Merging audio tracks...")
+        
+        # Combine original audio (if exists) with voice audio
+        if original_audio:
+            # Mix original audio with voice audio
+            original_audio = original_audio.set_duration(final_duration)
+            voice_audio_clip = voice_audio_clip.set_duration(final_duration)
+            
+            # If both audios have the same duration, we can use CompositeAudioClip
+            try:
+                from moviepy.audio.AudioClip import CompositeAudioClip
+                combined_audio = CompositeAudioClip([original_audio, voice_audio_clip])
+            except Exception as e:
+                # Fallback: use the voice audio as primary
+                print(f"Error using CompositeAudioClip: {e}")
+                combined_audio = voice_audio_clip
+        else:
+            # No original audio, just use voice audio
+            combined_audio = voice_audio_clip
+        
+        if progress_callback:
+            progress_callback(80, "Creating final video...")
+        
+        # Set combined audio to video
+        final_video = video_clip.set_audio(combined_audio)
+        
+        # Generate output path
+        output_filename = f"voice_added_{uuid.uuid4()}.mp4"
+        output_path = os.path.join(output_folder, output_filename)
+        
+        # Export the final video
+        final_video.write_videofile(
+            output_path,
+            codec='libx264',
+            audio_codec='aac',
+            verbose=False,
+            logger=None,
+            threads=4  # Use multiple threads for faster processing
+        )
+        
+        if progress_callback:
+            progress_callback(90, "Finalizing...")
+        
+        # Close clips to free memory
+        video_clip.close()
+        voice_audio_clip.close()
+        if original_audio:
+            original_audio.close()
+        if combined_audio:
+            combined_audio.close()
+        final_video.close()
+        
+        if progress_callback:
+            progress_callback(100, "Processing completed!")
+        
+        return output_path
+        
+    except Exception as e:
+        # Ensure clips are closed even on error
+        try:
+            if 'video_clip' in locals():
+                video_clip.close()
+            if 'voice_audio_clip' in locals():
+                voice_audio_clip.close()
+            if 'original_audio' in locals() and original_audio:
+                original_audio.close()
+            if 'combined_audio' in locals() and combined_audio:
+                combined_audio.close()
+            if 'final_video' in locals():
+                final_video.close()
+        except:
+            pass
+        
+        raise e

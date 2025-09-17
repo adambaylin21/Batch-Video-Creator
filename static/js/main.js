@@ -1,8 +1,10 @@
 const API_BASE = 'http://localhost:5001';
 let currentBatchId = null;
 let currentVABatchId = null;
+let currentVoiceBatchId = null;
 let statusInterval = null;
 let vaStatusInterval = null;
+let voiceStatusInterval = null;
 
 // DOM Elements
 // Tab elements
@@ -50,6 +52,23 @@ const vaDownloadLinks = document.getElementById('va-download-links');
 const audioTrimModeSelect = document.getElementById('audio-trim-mode');
 const audioSelectionModeSelect = document.getElementById('audio-selection-mode');
 
+// Voice Adder elements
+const voiceVideoFileInput = document.getElementById('voice-video-file');
+const voiceAudioFileInput = document.getElementById('voice-audio-file');
+const originalAudioVolumeInput = document.getElementById('original-audio-volume');
+const volumeValueSpan = document.getElementById('volume-value');
+const outputFolderPathVoiceInput = document.getElementById('output-folder-path-voice');
+const processVoiceBtn = document.getElementById('process-voice-btn');
+const voiceFileInfoSection = document.getElementById('voice-file-info-section');
+const videoFileInfo = document.getElementById('video-file-info');
+const audioFileInfo = document.getElementById('audio-file-info');
+const voiceProgressSection = document.getElementById('voice-progress-section');
+const voiceProgressFill = document.querySelector('.progress-fill-voice');
+const voiceProgressText = document.querySelector('.progress-text-voice');
+const voiceStatusMessage = document.getElementById('voice-status-message');
+const voiceResultsSection = document.getElementById('voice-results-section');
+const voiceDownloadLink = document.getElementById('voice-download-link');
+
 // Event Listeners
 // Tab switching
 tabBtns.forEach(btn => {
@@ -78,6 +97,12 @@ videoTrimModeSelect.addEventListener('change', updateVideoDurationDescription);
 // Video-Audio Merger event listeners
 scanVABtn.addEventListener('click', scanVAFolders);
 processVABtn.addEventListener('click', startVAProcessing);
+
+// Voice Adder event listeners
+voiceVideoFileInput.addEventListener('change', handleVideoFileSelect);
+voiceAudioFileInput.addEventListener('change', handleAudioFileSelect);
+originalAudioVolumeInput.addEventListener('input', updateVolumeValue);
+processVoiceBtn.addEventListener('click', startVoiceProcessing);
 
 // Functions
 async function browseInputFolder() {
@@ -837,6 +862,191 @@ function showVAResults(outputs) {
     `).join('');
     
     vaResultsSection.classList.remove('hidden');
+}
+
+// Voice Adder Functions
+function handleVideoFileSelect() {
+    const file = voiceVideoFileInput.files[0];
+    if (file) {
+        displayFileInfo('video', file);
+    }
+}
+
+function handleAudioFileSelect() {
+    const file = voiceAudioFileInput.files[0];
+    if (file) {
+        displayFileInfo('audio', file);
+    }
+}
+
+function updateVolumeValue() {
+    volumeValueSpan.textContent = `${originalAudioVolumeInput.value}%`;
+}
+
+function displayFileInfo(type, file) {
+    if (type === 'video') {
+        videoFileInfo.innerHTML = `
+            <div class="file-info-row">
+                <span class="file-info-label">Name:</span>
+                <span class="file-info-value">${file.name}</span>
+            </div>
+            <div class="file-info-row">
+                <span class="file-info-label">Size:</span>
+                <span class="file-info-value">${formatFileSize(file.size)}</span>
+            </div>
+            <div class="file-info-row">
+                <span class="file-info-label">Type:</span>
+                <span class="file-info-value">${file.type}</span>
+            </div>
+        `;
+    } else if (type === 'audio') {
+        audioFileInfo.innerHTML = `
+            <div class="file-info-row">
+                <span class="file-info-label">Name:</span>
+                <span class="file-info-value">${file.name}</span>
+            </div>
+            <div class="file-info-row">
+                <span class="file-info-label">Size:</span>
+                <span class="file-info-value">${formatFileSize(file.size)}</span>
+            </div>
+            <div class="file-info-row">
+                <span class="file-info-label">Type:</span>
+                <span class="file-info-value">${file.type}</span>
+            </div>
+        `;
+    }
+    
+    // Show the file info section if both files are selected
+    if (voiceVideoFileInput.files[0] && voiceAudioFileInput.files[0]) {
+        voiceFileInfoSection.classList.remove('hidden');
+    }
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+async function startVoiceProcessing() {
+    const videoFile = voiceVideoFileInput.files[0];
+    const audioFile = voiceAudioFileInput.files[0];
+    const outputFolderPath = outputFolderPathVoiceInput.value.trim();
+    const originalAudioVolume = parseInt(originalAudioVolumeInput.value);
+    
+    if (!videoFile) {
+        alert('Please select a video file');
+        return;
+    }
+    
+    if (!audioFile) {
+        alert('Please select a voice audio file');
+        return;
+    }
+    
+    if (!outputFolderPath) {
+        alert('Please select an output folder');
+        return;
+    }
+    
+    processVoiceBtn.disabled = true;
+    processVoiceBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    showVoiceProgressSection();
+    updateVoiceProgress(0, 'Starting processing...');
+    
+    try {
+        const formData = new FormData();
+        formData.append('video_file', videoFile);
+        formData.append('audio_file', audioFile);
+        formData.append('output_folder_path', outputFolderPath);
+        formData.append('original_audio_volume', originalAudioVolume);
+        
+        const response = await fetch(`${API_BASE}/api/process-voice-adder`, {
+            method: 'POST',
+            body: formData,
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentVoiceBatchId = data.batch_id;
+            pollVoiceStatus();
+        } else {
+            alert('Error: ' + data.error);
+            hideVoiceProgressSection();
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+        hideVoiceProgressSection();
+    } finally {
+        processVoiceBtn.disabled = false;
+        processVoiceBtn.innerHTML = '<i class="fas fa-play"></i> Process Video';
+    }
+}
+
+function showVoiceProgressSection() {
+    voiceProgressSection.classList.remove('hidden');
+    voiceResultsSection.classList.add('hidden');
+}
+
+function hideVoiceProgressSection() {
+    voiceProgressSection.classList.add('hidden');
+}
+
+function updateVoiceProgress(percent, message) {
+    voiceProgressFill.style.width = `${percent}%`;
+    voiceProgressText.textContent = `${percent}%`;
+    voiceStatusMessage.textContent = message;
+}
+
+async function pollVoiceStatus() {
+    if (voiceStatusInterval) {
+        clearInterval(voiceStatusInterval);
+    }
+    
+    voiceStatusInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/status/${currentVoiceBatchId}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                updateVoiceProgress(data.progress || 0, data.message || data.status);
+                
+                if (data.status === 'completed') {
+                    clearInterval(voiceStatusInterval);
+                    showVoiceResult(data.outputs[0]);
+                } else if (data.status === 'error') {
+                    clearInterval(voiceStatusInterval);
+                    alert('Processing error: ' + data.error);
+                    hideVoiceProgressSection();
+                }
+            } else {
+                clearInterval(voiceStatusInterval);
+                alert('Status error: ' + data.error);
+                hideVoiceProgressSection();
+            }
+        } catch (error) {
+            clearInterval(voiceStatusInterval);
+            alert('Network error: ' + error.message);
+            hideVoiceProgressSection();
+        }
+    }, 2000);
+}
+
+function showVoiceResult(filename) {
+    voiceDownloadLink.innerHTML = `
+        <a href="${API_BASE}/api/download/${currentVoiceBatchId}/${filename}" download>
+            <i class="fas fa-download"></i>
+            ${filename}
+        </a>
+    `;
+    
+    voiceResultsSection.classList.remove('hidden');
 }
 
 // Initialize video duration description on page load
