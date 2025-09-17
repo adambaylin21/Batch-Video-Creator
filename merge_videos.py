@@ -178,7 +178,7 @@ def normalize_video(input_path, output_path, trim_info=None):
                     logging.info(f"Using CPU-based encoding with codec: {codec}")
                 
                 # Write normalized video with selected parameters
-                clip.write_videofile(**encoding_params)
+                clip.write_videofile(output_path, **encoding_params)
                 
                 return True
         except Exception as clip_error:
@@ -410,7 +410,7 @@ def merge_videos_with_trims(files, trims, upload_folder, output_folder):
                 logging.info(f"Using CPU-based encoding for final merge with codec: {codec}")
             
             # Write final video with selected parameters
-            final_clip.write_videofile(**encoding_params)
+            final_clip.write_videofile(output_path, **encoding_params)
             
             # Close clips to free memory
             for clip in clips:

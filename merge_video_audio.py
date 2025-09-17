@@ -176,7 +176,7 @@ def process_video_audio(job_id, video_path, audio_path, output_folder, processin
             logging.info(f"Using CPU-based encoding with codec: {codec}")
         
         # Export the final video with selected parameters
-        final_video.write_videofile(**encoding_params)
+        final_video.write_videofile(output_path, **encoding_params)
         
         if job_id in processing_status:
             processing_status[job_id]['progress'] = 100
@@ -357,7 +357,7 @@ def merge_video_with_voice(video_path, audio_path, output_folder, progress_callb
             logging.info(f"Using CPU-based encoding for voice merge with codec: {codec}")
         
         # Export the final video with selected parameters
-        final_video.write_videofile(**encoding_params)
+        final_video.write_videofile(output_path, **encoding_params)
         
         if progress_callback:
             progress_callback(90, "Finalizing...")
