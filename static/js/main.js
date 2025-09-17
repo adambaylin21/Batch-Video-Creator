@@ -115,6 +115,43 @@ videoTrimModeSelect.addEventListener('change', updateVideoDurationDescription);
 scanVABtn.addEventListener('click', scanVAFolders);
 processVABtn.addEventListener('click', startVAProcessing);
 
+// Settings panel event listeners
+// Use both click and touch events for better Safari/iOS compatibility
+settingsButton.addEventListener('click', function(e) {
+    e.preventDefault();
+    openSettingsPanel();
+});
+
+settingsButton.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    openSettingsPanel();
+});
+
+closeSettings.addEventListener('click', function(e) {
+    e.preventDefault();
+    closeSettingsPanel();
+});
+
+closeSettings.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    closeSettingsPanel();
+});
+
+saveSettingsBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    saveSettings();
+});
+
+clearCacheBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    clearCache();
+});
+
+refreshSystemInfoBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    refreshSystemInfo();
+});
+
 // Voice Adder event listeners
 voiceVideoFileInput.addEventListener('change', handleVideoFileSelect);
 voiceAudioFileInput.addEventListener('change', handleAudioFileSelect);
@@ -1068,6 +1105,8 @@ function showVoiceResult(filename) {
 
 // Settings panel functions
 function openSettingsPanel() {
+    // Force a reflow to ensure CSS transitions work properly in Safari
+    void settingsPanel.offsetWidth;
     settingsPanel.classList.add('active');
     // Load current settings
     loadSettings();
@@ -1081,6 +1120,8 @@ function openSettingsPanel() {
 }
 
 function closeSettingsPanel() {
+    // Force a reflow to ensure CSS transitions work properly in Safari
+    void settingsPanel.offsetWidth;
     settingsPanel.classList.remove('active');
     // Stop polling system info
     if (systemInfoInterval) {

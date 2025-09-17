@@ -619,16 +619,32 @@ button:disabled {
     border: none;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    display: -webkit-flex;
     display: flex;
+    -webkit-justify-content: center;
     justify-content: center;
+    -webkit-align-items: center;
     align-items: center;
     z-index: 100;
+    -webkit-transition: all 0.3s ease;
     transition: all 0.3s ease;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    /* Safari/iOS specific fixes */
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
 }
 
 .settings-button:hover {
+    -webkit-transform: scale(1.1);
     transform: scale(1.1);
     box-shadow: 0 6px 16px rgba(99, 102, 241, 0.6);
+}
+
+.settings-button:active {
+    -webkit-transform: scale(0.95);
+    transform: scale(0.95);
 }
 
 .settings-panel {
@@ -640,9 +656,14 @@ button:disabled {
     background: var(--card-bg);
     box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
     z-index: 200;
+    -webkit-transition: right 0.3s ease;
     transition: right 0.3s ease;
     overflow-y: auto;
     padding: 20px;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    /* Safari specific fixes */
+    -webkit-overflow-scrolling: touch;
 }
 
 .settings-panel.active {
@@ -660,14 +681,29 @@ button:disabled {
     border: none;
     color: var(--text-primary);
     cursor: pointer;
+    display: -webkit-flex;
     display: flex;
+    -webkit-justify-content: center;
     justify-content: center;
+    -webkit-align-items: center;
     align-items: center;
+    -webkit-transition: all 0.2s ease;
     transition: all 0.2s ease;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    /* Safari/iOS specific fixes */
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
 }
 
 .close-settings:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+.close-settings:active {
+    -webkit-transform: scale(0.9);
+    transform: scale(0.9);
 }
 
 .form-select {
