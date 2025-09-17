@@ -35,8 +35,31 @@ def is_gpu_acceleration_available():
     
     try:
         import subprocess
-        result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True)
-        return GPU_CODEC in result.stdout
+        import shutil
+        
+        # Check if ffmpeg is available
+        ffmpeg_path = shutil.which('ffmpeg')
+        if not ffmpeg_path:
+            logging.info("FFmpeg not found in PATH")
+            return False
+        
+        logging.info(f"FFmpeg found at: {ffmpeg_path}")
+        
+        # Run ffmpeg to check for GPU encoders
+        result = subprocess.run([ffmpeg_path, '-encoders'], capture_output=True, text=True)
+        if result.returncode != 0:
+            logging.warning(f"FFmpeg command failed with return code: {result.returncode}")
+            return False
+        
+        # Check if GPU codec is available
+        gpu_available = GPU_CODEC in result.stdout
+        logging.info(f"GPU codec {GPU_CODEC} available: {gpu_available}")
+        
+        # List available encoders for debugging
+        available_encoders = [line.split()[1] for line in result.stdout.split('\n') if 'encoding:' in line and 'V' in line.split('\t')]
+        logging.info(f"Available video encoders: {available_encoders[:10]}...")  # Show first 10
+        
+        return gpu_available
     except Exception as e:
         logging.warning(f"Error checking GPU acceleration availability: {e}")
         return False
@@ -101,10 +124,14 @@ def validate_video(file_path):
 
 def normalize_video(input_path, output_path, trim_info=None):
     """Normalize video to standard format, fps, and resolution."""
+    import threading
+    thread_id = threading.get_ident()
+    logging.info(f"Thread {thread_id}: Starting normalization of {os.path.basename(input_path)}")
+    
     try:
         # Check if input file exists
         if not os.path.exists(input_path):
-            logging.error(f"Input file does not exist: {input_path}")
+            logging.error(f"Thread {thread_id}: Input file does not exist: {input_path}")
             return False
         
         # Ensure output directory exists
@@ -114,7 +141,7 @@ def normalize_video(input_path, output_path, trim_info=None):
         try:
             with VideoFileClip(input_path) as clip:
                 if clip.duration <= 0:
-                    logging.error(f"Video has invalid duration: {clip.duration}")
+                    logging.error(f"Thread {thread_id}: Video has invalid duration: {clip.duration}")
                     return False
                 
                 # Apply trim if specified
@@ -122,18 +149,21 @@ def normalize_video(input_path, output_path, trim_info=None):
                     start = float(trim_info.get('start', 0))
                     end = float(trim_info.get('end')) if trim_info.get('end') else clip.duration
                     if start >= end:
-                        logging.error(f'Invalid trim times: start ({start}) >= end ({end})')
+                        logging.error(f"Thread {thread_id}: Invalid trim times: start ({start}) >= end ({end})")
                         return False
                     clip = clip.subclip(start, end)
                 
                 # Normalize FPS
                 if clip.fps != TARGET_FPS:
+                    logging.info(f"Thread {thread_id}: Normalizing FPS from {clip.fps} to {TARGET_FPS}")
                     clip = clip.set_fps(TARGET_FPS)
                 
                 # Normalize resolution
                 if TARGET_WIDTH:
+                    logging.info(f"Thread {thread_id}: Normalizing resolution to {TARGET_WIDTH}x{TARGET_HEIGHT}")
                     clip = clip.resize((TARGET_WIDTH, TARGET_HEIGHT))
                 else:
+                    logging.info(f"Thread {thread_id}: Normalizing height to {TARGET_HEIGHT}")
                     clip = clip.resize(height=TARGET_HEIGHT)
                 
                 # Apply video quality settings
@@ -163,7 +193,7 @@ def normalize_video(input_path, output_path, trim_info=None):
                         'verbose': False,
                         'logger': None
                     }
-                    logging.info(f"Using GPU acceleration with codec: {codec}")
+                    logging.info(f"Thread {thread_id}: Using GPU acceleration with codec: {codec}")
                 else:
                     # CPU-specific parameters
                     encoding_params = {
@@ -175,21 +205,27 @@ def normalize_video(input_path, output_path, trim_info=None):
                         'logger': None,
                         'threads': MAX_WORKERS
                     }
-                    logging.info(f"Using CPU-based encoding with codec: {codec}")
+                    logging.info(f"Thread {thread_id}: Using CPU-based encoding with {MAX_WORKERS} threads and codec: {codec}")
                 
                 # Write normalized video with selected parameters
+                logging.info(f"Thread {thread_id}: Writing normalized video to {output_path}")
                 clip.write_videofile(output_path, **encoding_params)
+                logging.info(f"Thread {thread_id}: Completed normalization of {os.path.basename(input_path)}")
                 
                 return True
         except Exception as clip_error:
-            logging.error(f"Error processing video clip from {input_path}: {clip_error}")
+            logging.error(f"Thread {thread_id}: Error processing video clip from {input_path}: {clip_error}")
             return False
     except Exception as e:
-        logging.error(f"Failed to normalize video {input_path}: {e}")
+        logging.error(f"Thread {thread_id}: Failed to normalize video {input_path}: {e}")
         return False
 
 def process_video_task(file_path, trim_info, output_dir):
     """Process a single video task with caching and normalization."""
+    import threading
+    thread_id = threading.get_ident()
+    logging.info(f"Thread {thread_id}: Starting to process video: {os.path.basename(file_path)}")
+    
     try:
         # Check if input file exists
         if not os.path.exists(file_path):
@@ -203,7 +239,7 @@ def process_video_task(file_path, trim_info, output_dir):
         
         # Check if video is already cached
         if is_video_cached(file_hash):
-            logging.info(f"Using cached video for {file_path}")
+            logging.info(f"Thread {thread_id}: Using cached video for {file_path}")
             return cache_path
         
         # Validate video
@@ -212,23 +248,24 @@ def process_video_task(file_path, trim_info, output_dir):
             raise ValueError(f'Invalid video: {file_path}')
         
         # Log video metadata for debugging
-        logging.info(f"Processing video: {file_path}, metadata: {metadata}")
+        logging.info(f"Thread {thread_id}: Processing video: {file_path}, metadata: {metadata}")
         
         # Normalize video with fallback to original file if normalization fails
         if normalize_video(file_path, cache_path, trim_info):
             # Verify the output file was created successfully
             if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                logging.info(f"Thread {thread_id}: Successfully normalized video: {file_path}")
                 return cache_path
             else:
-                logging.warning(f"Normalized video file is empty or not created: {cache_path}")
+                logging.warning(f"Thread {thread_id}: Normalized video file is empty or not created: {cache_path}")
                 # Fall back to using the original file
                 return file_path
         else:
-            logging.warning(f"Failed to normalize video {file_path}, using original file")
+            logging.warning(f"Thread {thread_id}: Failed to normalize video {file_path}, using original file")
             # Fall back to using the original file
             return file_path
     except Exception as e:
-        logging.error(f"Error in process_video_task for {file_path}: {e}")
+        logging.error(f"Thread {thread_id}: Error in process_video_task for {file_path}: {e}")
         # Fall back to using the original file
         return file_path
 
@@ -292,6 +329,7 @@ def merge_videos_with_trims(files, trims, upload_folder, output_folder):
         os.makedirs(output_folder, exist_ok=True)
         
         # Process videos in parallel
+        logging.info(f"Starting parallel processing with {MAX_WORKERS} workers")
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = []
             
@@ -310,12 +348,16 @@ def merge_videos_with_trims(files, trims, upload_folder, output_folder):
                     continue
                 
                 # Submit video processing task
+                logging.info(f"Submitting video task for processing: {filename}")
                 future = executor.submit(process_video_task, file_path, trim, output_folder)
                 futures.append((future, filename))
             
+            logging.info(f"Submitted {len(futures)} tasks for parallel processing")
+            
             # Collect processed video paths
-            for future, filename in futures:
+            for i, (future, filename) in enumerate(futures):
                 try:
+                    logging.info(f"Waiting for task {i+1}/{len(futures)}: {filename}")
                     processed_path = future.result()
                     if processed_path and os.path.exists(processed_path):
                         processed_clips.append(processed_path)

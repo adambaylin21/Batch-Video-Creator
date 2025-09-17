@@ -488,12 +488,35 @@ def get_gpu_info():
     """Get GPU information for monitoring."""
     try:
         from merge_videos import is_gpu_acceleration_available
+        import subprocess
+        import shutil
+        
+        # Check if ffmpeg is available
+        ffmpeg_path = shutil.which('ffmpeg')
+        ffmpeg_info = {
+            'available': ffmpeg_path is not None,
+            'path': ffmpeg_path if ffmpeg_path else 'Not found'
+        }
+        
+        # Get FFmpeg version if available
+        if ffmpeg_path:
+            try:
+                result = subprocess.run([ffmpeg_path, '-version'], capture_output=True, text=True)
+                version_line = result.stdout.split('\n')[0] if result.stdout else 'Unknown'
+                ffmpeg_info['version'] = version_line
+            except Exception as e:
+                ffmpeg_info['version'] = f'Error getting version: {str(e)}'
+        
+        # Check GPU acceleration
+        gpu_available = is_gpu_acceleration_available()
         
         return jsonify({
-            'gpu_acceleration_available': is_gpu_acceleration_available(),
+            'gpu_acceleration_available': gpu_available,
             'gpu_acceleration_enabled': ENABLE_GPU_ACCELERATION,
             'gpu_codec': GPU_CODEC,
-            'cpu_codec': FALLBACK_CPU_CODEC
+            'cpu_codec': FALLBACK_CPU_CODEC,
+            'ffmpeg_info': ffmpeg_info,
+            'max_workers': MAX_WORKERS
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

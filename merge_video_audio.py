@@ -24,8 +24,31 @@ def is_gpu_acceleration_available():
         return False
     
     try:
-        result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True)
-        return GPU_CODEC in result.stdout
+        import shutil
+        
+        # Check if ffmpeg is available
+        ffmpeg_path = shutil.which('ffmpeg')
+        if not ffmpeg_path:
+            logging.info("FFmpeg not found in PATH")
+            return False
+        
+        logging.info(f"FFmpeg found at: {ffmpeg_path}")
+        
+        # Run ffmpeg to check for GPU encoders
+        result = subprocess.run([ffmpeg_path, '-encoders'], capture_output=True, text=True)
+        if result.returncode != 0:
+            logging.warning(f"FFmpeg command failed with return code: {result.returncode}")
+            return False
+        
+        # Check if GPU codec is available
+        gpu_available = GPU_CODEC in result.stdout
+        logging.info(f"GPU codec {GPU_CODEC} available: {gpu_available}")
+        
+        # List available encoders for debugging
+        available_encoders = [line.split()[1] for line in result.stdout.split('\n') if 'encoding:' in line and 'V' in line.split('\t')]
+        logging.info(f"Available video encoders: {available_encoders[:10]}...")  # Show first 10
+        
+        return gpu_available
     except Exception as e:
         logging.warning(f"Error checking GPU acceleration availability: {e}")
         return False

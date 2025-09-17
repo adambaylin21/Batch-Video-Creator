@@ -8,4 +8,8 @@ psutil==5.9.8
 # Note: FFmpeg with GPU acceleration support (h264_nvenc) is required for GPU acceleration
 # On Ubuntu/Debian: sudo apt install ffmpeg
 # On macOS: brew install ffmpeg
-# On Windows: Download from https://ffmpeg.org/download.html
+# On Windows:
+#   1. Download from https://ffmpeg.org/download.html
+#   2. Extract the files to a folder (e.g., C:\ffmpeg)
+#   3. Add the folder to your system PATH environment variable
+#   4. Or use Chocolatey: choco install ffmpeg
