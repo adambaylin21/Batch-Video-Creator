@@ -25,6 +25,8 @@ def is_gpu_acceleration_available():
     
     try:
         import shutil
+        import tempfile
+        import os
         
         # Check if ffmpeg is available
         ffmpeg_path = shutil.which('ffmpeg')
@@ -48,7 +50,52 @@ def is_gpu_acceleration_available():
         available_encoders = [line.split()[1] for line in result.stdout.split('\n') if 'encoding:' in line and 'V' in line.split('\t')]
         logging.info(f"Available video encoders: {available_encoders[:10]}...")  # Show first 10
         
-        return gpu_available
+        if not gpu_available:
+            return False
+        
+        # Test if GPU encoding actually works by creating a test video
+        logging.info("Testing GPU encoding with a short test video...")
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_file:
+            temp_path = temp_file.name
+        
+        try:
+            # Create a simple test video using GPU encoding
+            test_cmd = [
+                ffmpeg_path,
+                '-f', 'lavfi',
+                '-i', 'testsrc=duration=1:size=320x240:rate=1',
+                '-c:v', GPU_CODEC,
+                '-preset', GPU_ENCODING_PRESET,
+                '-b:v', '500k',
+                '-y',  # Overwrite output file if it exists
+                temp_path
+            ]
+            
+            test_result = subprocess.run(test_cmd, capture_output=True, text=True)
+            
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+            
+            if test_result.returncode == 0:
+                logging.info("GPU encoding test successful")
+                return True
+            else:
+                logging.warning(f"GPU encoding test failed with return code: {test_result.returncode}")
+                logging.warning(f"GPU encoding test stderr: {test_result.stderr}")
+                return False
+                
+        except Exception as test_error:
+            logging.warning(f"Error during GPU encoding test: {test_error}")
+            # Clean up temp file if it exists
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+            return False
+            
     except Exception as e:
         logging.warning(f"Error checking GPU acceleration availability: {e}")
         return False
@@ -186,20 +233,59 @@ def process_video_audio(job_id, video_path, audio_path, output_folder, processin
                 'logger': None
             }
             logging.info(f"Using GPU acceleration with codec: {codec}")
-        else:
+            
+            # Try GPU encoding first with fallback to CPU
+            try:
+                # Export the final video with GPU parameters
+                final_video.write_videofile(output_path, **encoding_params)
+                logging.info(f"Successfully merged video with audio using GPU acceleration")
+            except Exception as gpu_error:
+                logging.warning(f"GPU encoding failed for video+audio merge: {str(gpu_error)}")
+                logging.info("Falling back to CPU encoding for video+audio merge")
+                
+                # Close and reload the clips to ensure clean state
+                video_clip.close()
+                audio_clip.close()
+                final_video.close()
+                
+                video_clip = VideoFileClip(video_path)
+                audio_clip = AudioFileClip(audio_path)
+                
+                # Re-trim audio to match video duration
+                if audio_clip.duration > video_clip.duration:
+                    if audio_trim_mode == 'random':
+                        max_start_time = audio_clip.duration - video_clip.duration
+                        start_time = random.uniform(0, max_start_time)
+                        end_time = start_time + video_clip.duration
+                        audio_clip = audio_clip.subclip(start_time, end_time)
+                    else:
+                        audio_clip = audio_clip.subclip(0, video_clip.duration)
+                elif audio_clip.duration < video_clip.duration:
+                    # Keep audio as is, MoviePy will handle it
+                    pass
+                
+                # Re-set trimmed audio to video
+                final_video = video_clip.set_audio(audio_clip)
+                
+                # Switch to CPU encoding
+                use_gpu = False
+        
+        # CPU encoding (either as primary choice or fallback)
+        if not use_gpu:
             # CPU-specific parameters
             encoding_params = {
-                'codec': codec,
+                'codec': FALLBACK_CPU_CODEC,
                 'audio_codec': 'aac',
                 'bitrate': VIDEO_BITRATE,
                 'verbose': False,
                 'logger': None,
                 'threads': MAX_WORKERS
             }
-            logging.info(f"Using CPU-based encoding with codec: {codec}")
-        
-        # Export the final video with selected parameters
-        final_video.write_videofile(output_path, **encoding_params)
+            logging.info(f"Using CPU-based encoding with codec: {FALLBACK_CPU_CODEC}")
+            
+            # Export the final video with CPU parameters
+            final_video.write_videofile(output_path, **encoding_params)
+            logging.info(f"Successfully merged video with audio using CPU encoding")
         
         if job_id in processing_status:
             processing_status[job_id]['progress'] = 100
@@ -367,20 +453,84 @@ def merge_video_with_voice(video_path, audio_path, output_folder, progress_callb
                 'logger': None
             }
             logging.info(f"Using GPU acceleration for voice merge with codec: {codec}")
-        else:
+            
+            # Try GPU encoding first with fallback to CPU
+            try:
+                # Export the final video with GPU parameters
+                final_video.write_videofile(output_path, **encoding_params)
+                logging.info(f"Successfully merged video with voice using GPU acceleration")
+            except Exception as gpu_error:
+                logging.warning(f"GPU encoding failed for video+voice merge: {str(gpu_error)}")
+                logging.info("Falling back to CPU encoding for video+voice merge")
+                
+                # Close and reload the clips to ensure clean state
+                video_clip.close()
+                voice_audio_clip.close()
+                if original_audio:
+                    original_audio.close()
+                if combined_audio:
+                    combined_audio.close()
+                final_video.close()
+                
+                # Reload all clips
+                video_clip = VideoFileClip(video_path)
+                voice_audio_clip = AudioFileClip(audio_path)
+                
+                # Re-trim video to match voice audio duration
+                video_duration = video_clip.duration
+                voice_duration = voice_audio_clip.duration
+                
+                if video_duration > voice_duration:
+                    final_duration = voice_duration
+                    video_clip = video_clip.subclip(0, final_duration)
+                elif video_duration < voice_duration:
+                    voice_audio_clip = voice_audio_clip.subclip(0, video_duration)
+                    final_duration = video_duration
+                else:
+                    final_duration = video_duration
+                
+                # Re-adjust original audio volume
+                original_audio = video_clip.audio
+                if original_audio:
+                    volume_multiplier = original_audio_volume / 100.0
+                    original_audio = original_audio.volumex(volume_multiplier)
+                
+                # Re-combine audio tracks
+                if original_audio:
+                    original_audio = original_audio.set_duration(final_duration)
+                    voice_audio_clip = voice_audio_clip.set_duration(final_duration)
+                    
+                    try:
+                        from moviepy.audio.AudioClip import CompositeAudioClip
+                        combined_audio = CompositeAudioClip([original_audio, voice_audio_clip])
+                    except Exception as e:
+                        logging.warning(f"Error using CompositeAudioClip: {e}")
+                        combined_audio = voice_audio_clip
+                else:
+                    combined_audio = voice_audio_clip
+                
+                # Re-set combined audio to video
+                final_video = video_clip.set_audio(combined_audio)
+                
+                # Switch to CPU encoding
+                use_gpu = False
+        
+        # CPU encoding (either as primary choice or fallback)
+        if not use_gpu:
             # CPU-specific parameters
             encoding_params = {
-                'codec': codec,
+                'codec': FALLBACK_CPU_CODEC,
                 'audio_codec': 'aac',
                 'bitrate': VIDEO_BITRATE,
                 'verbose': False,
                 'logger': None,
                 'threads': MAX_WORKERS
             }
-            logging.info(f"Using CPU-based encoding for voice merge with codec: {codec}")
-        
-        # Export the final video with selected parameters
-        final_video.write_videofile(output_path, **encoding_params)
+            logging.info(f"Using CPU-based encoding for voice merge with codec: {FALLBACK_CPU_CODEC}")
+            
+            # Export the final video with CPU parameters
+            final_video.write_videofile(output_path, **encoding_params)
+            logging.info(f"Successfully merged video with voice using CPU encoding")
         
         if progress_callback:
             progress_callback(90, "Finalizing...")

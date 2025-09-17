@@ -36,6 +36,8 @@ def is_gpu_acceleration_available():
     try:
         import subprocess
         import shutil
+        import tempfile
+        import os
         
         # Check if ffmpeg is available
         ffmpeg_path = shutil.which('ffmpeg')
@@ -59,7 +61,52 @@ def is_gpu_acceleration_available():
         available_encoders = [line.split()[1] for line in result.stdout.split('\n') if 'encoding:' in line and 'V' in line.split('\t')]
         logging.info(f"Available video encoders: {available_encoders[:10]}...")  # Show first 10
         
-        return gpu_available
+        if not gpu_available:
+            return False
+        
+        # Test if GPU encoding actually works by creating a test video
+        logging.info("Testing GPU encoding with a short test video...")
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_file:
+            temp_path = temp_file.name
+        
+        try:
+            # Create a simple test video using GPU encoding
+            test_cmd = [
+                ffmpeg_path,
+                '-f', 'lavfi',
+                '-i', 'testsrc=duration=1:size=320x240:rate=1',
+                '-c:v', GPU_CODEC,
+                '-preset', GPU_ENCODING_PRESET,
+                '-b:v', '500k',
+                '-y',  # Overwrite output file if it exists
+                temp_path
+            ]
+            
+            test_result = subprocess.run(test_cmd, capture_output=True, text=True)
+            
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+            
+            if test_result.returncode == 0:
+                logging.info("GPU encoding test successful")
+                return True
+            else:
+                logging.warning(f"GPU encoding test failed with return code: {test_result.returncode}")
+                logging.warning(f"GPU encoding test stderr: {test_result.stderr}")
+                return False
+                
+        except Exception as test_error:
+            logging.warning(f"Error during GPU encoding test: {test_error}")
+            # Clean up temp file if it exists
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+            return False
+            
     except Exception as e:
         logging.warning(f"Error checking GPU acceleration availability: {e}")
         return False
@@ -194,10 +241,45 @@ def normalize_video(input_path, output_path, trim_info=None):
                         'logger': None
                     }
                     logging.info(f"Thread {thread_id}: Using GPU acceleration with codec: {codec}")
-                else:
+                    
+                    # Try GPU encoding first with fallback to CPU
+                    try:
+                        # Write normalized video with GPU parameters
+                        logging.info(f"Thread {thread_id}: Writing normalized video to {output_path} using GPU")
+                        clip.write_videofile(output_path, **encoding_params)
+                        logging.info(f"Thread {thread_id}: Completed GPU normalization of {os.path.basename(input_path)}")
+                        return True
+                    except Exception as gpu_error:
+                        logging.warning(f"Thread {thread_id}: GPU encoding failed: {str(gpu_error)}")
+                        logging.info(f"Thread {thread_id}: Falling back to CPU encoding")
+                        
+                        # Close and reload the clip to ensure clean state
+                        clip.close()
+                        clip = VideoFileClip(input_path)
+                        
+                        # Re-apply trim if specified
+                        if trim_info:
+                            start = float(trim_info.get('start', 0))
+                            end = float(trim_info.get('end')) if trim_info.get('end') else clip.duration
+                            clip = clip.subclip(start, end)
+                        
+                        # Re-normalize FPS and resolution
+                        if clip.fps != TARGET_FPS:
+                            clip = clip.set_fps(TARGET_FPS)
+                        
+                        if TARGET_WIDTH:
+                            clip = clip.resize((TARGET_WIDTH, TARGET_HEIGHT))
+                        else:
+                            clip = clip.resize(height=TARGET_HEIGHT)
+                        
+                        # Switch to CPU encoding
+                        use_gpu = False
+                
+                # CPU encoding (either as primary choice or fallback)
+                if not use_gpu:
                     # CPU-specific parameters
                     encoding_params = {
-                        'codec': codec,
+                        'codec': FALLBACK_CPU_CODEC,
                         'preset': VIDEO_PRESET,
                         'audio_codec': None,  # Disable audio processing
                         'bitrate': bitrate,
@@ -205,14 +287,13 @@ def normalize_video(input_path, output_path, trim_info=None):
                         'logger': None,
                         'threads': MAX_WORKERS
                     }
-                    logging.info(f"Thread {thread_id}: Using CPU-based encoding with {MAX_WORKERS} threads and codec: {codec}")
-                
-                # Write normalized video with selected parameters
-                logging.info(f"Thread {thread_id}: Writing normalized video to {output_path}")
-                clip.write_videofile(output_path, **encoding_params)
-                logging.info(f"Thread {thread_id}: Completed normalization of {os.path.basename(input_path)}")
-                
-                return True
+                    logging.info(f"Thread {thread_id}: Using CPU-based encoding with {MAX_WORKERS} threads and codec: {FALLBACK_CPU_CODEC}")
+                    
+                    # Write normalized video with CPU parameters
+                    logging.info(f"Thread {thread_id}: Writing normalized video to {output_path} using CPU")
+                    clip.write_videofile(output_path, **encoding_params)
+                    logging.info(f"Thread {thread_id}: Completed CPU normalization of {os.path.basename(input_path)}")
+                    return True
         except Exception as clip_error:
             logging.error(f"Thread {thread_id}: Error processing video clip from {input_path}: {clip_error}")
             return False
@@ -438,10 +519,24 @@ def merge_videos_with_trims(files, trims, upload_folder, output_folder):
                     'logger': None
                 }
                 logging.info(f"Using GPU acceleration for final merge with codec: {codec}")
-            else:
+                
+                # Try GPU encoding first with fallback to CPU
+                try:
+                    # Write final video with GPU parameters
+                    final_clip.write_videofile(output_path, **encoding_params)
+                    logging.info(f"Successfully merged videos using GPU acceleration")
+                except Exception as gpu_error:
+                    logging.warning(f"GPU encoding failed for final merge: {str(gpu_error)}")
+                    logging.info("Falling back to CPU encoding for final merge")
+                    
+                    # Switch to CPU encoding
+                    use_gpu = False
+            
+            # CPU encoding (either as primary choice or fallback)
+            if not use_gpu:
                 # CPU-specific parameters
                 encoding_params = {
-                    'codec': codec,
+                    'codec': FALLBACK_CPU_CODEC,
                     'preset': VIDEO_PRESET,
                     'audio_codec': None,  # Skip audio processing
                     'bitrate': bitrate,
@@ -449,10 +544,11 @@ def merge_videos_with_trims(files, trims, upload_folder, output_folder):
                     'logger': None,
                     'threads': MAX_WORKERS
                 }
-                logging.info(f"Using CPU-based encoding for final merge with codec: {codec}")
-            
-            # Write final video with selected parameters
-            final_clip.write_videofile(output_path, **encoding_params)
+                logging.info(f"Using CPU-based encoding for final merge with codec: {FALLBACK_CPU_CODEC}")
+                
+                # Write final video with CPU parameters
+                final_clip.write_videofile(output_path, **encoding_params)
+                logging.info(f"Successfully merged videos using CPU encoding")
             
             # Close clips to free memory
             for clip in clips:
