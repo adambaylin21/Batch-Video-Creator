@@ -5,11 +5,28 @@ let currentVoiceBatchId = null;
 let statusInterval = null;
 let vaStatusInterval = null;
 let voiceStatusInterval = null;
+let systemInfoInterval = null;
 
 // DOM Elements
 // Tab elements
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabPanes = document.querySelectorAll('.tab-pane');
+
+// Settings panel elements
+const settingsButton = document.getElementById('settings-button');
+const settingsPanel = document.getElementById('settings-panel');
+const closeSettings = document.getElementById('close-settings');
+const videoQualitySelect = document.getElementById('video-quality');
+const enableCachingCheckbox = document.getElementById('enable-caching');
+const maxWorkersInput = document.getElementById('max-workers');
+const skipAudioCheckbox = document.getElementById('skip-audio');
+const saveSettingsBtn = document.getElementById('save-settings');
+const clearCacheBtn = document.getElementById('clear-cache');
+const refreshSystemInfoBtn = document.getElementById('refresh-system-info');
+const cpuUsageSpan = document.getElementById('cpu-usage');
+const memoryUsageSpan = document.getElementById('memory-usage');
+const diskUsageSpan = document.getElementById('disk-usage');
+const cacheSizeSpan = document.getElementById('cache-size');
 
 // Batch Creator elements
 const inputFolderPathInput = document.getElementById('input-folder-path');
@@ -1047,6 +1064,109 @@ function showVoiceResult(filename) {
     `;
     
     voiceResultsSection.classList.remove('hidden');
+}
+
+// Settings panel functions
+function openSettingsPanel() {
+    settingsPanel.classList.add('active');
+    // Load current settings
+    loadSettings();
+    // Load system info
+    refreshSystemInfo();
+    // Start polling system info
+    if (systemInfoInterval) {
+        clearInterval(systemInfoInterval);
+    }
+    systemInfoInterval = setInterval(refreshSystemInfo, 5000);
+}
+
+function closeSettingsPanel() {
+    settingsPanel.classList.remove('active');
+    // Stop polling system info
+    if (systemInfoInterval) {
+        clearInterval(systemInfoInterval);
+        systemInfoInterval = null;
+    }
+}
+
+async function loadSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/system-info`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            videoQualitySelect.value = data.video_quality || 'medium';
+            enableCachingCheckbox.checked = data.cache_enabled !== false;
+            maxWorkersInput.value = data.max_workers || 4;
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+
+async function saveSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/update-settings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                video_quality: videoQualitySelect.value,
+                enable_caching: enableCachingCheckbox.checked,
+                max_workers: parseInt(maxWorkersInput.value),
+            }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Settings saved successfully!');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+    }
+}
+
+async function clearCache() {
+    if (!confirm('Are you sure you want to clear the video cache? This will remove all cached videos and may slow down future processing.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/clear-cache`, {
+            method: 'POST',
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Cache cleared successfully!');
+            refreshSystemInfo();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+    }
+}
+
+async function refreshSystemInfo() {
+    try {
+        const response = await fetch(`${API_BASE}/api/system-info`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            cpuUsageSpan.textContent = `${data.cpu_percent}%`;
+            memoryUsageSpan.textContent = `${data.memory_percent}%`;
+            diskUsageSpan.textContent = `${data.disk_percent}%`;
+            cacheSizeSpan.textContent = formatFileSize(data.cache_size);
+        }
+    } catch (error) {
+        console.error('Error refreshing system info:', error);
+    }
 }
 
 // Initialize video duration description on page load

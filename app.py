@@ -10,6 +10,9 @@ from werkzeug.utils import secure_filename
 from video_processor import VideoProcessor
 from config import *
 
+# Import cache cleanup function
+from merge_videos import cleanup_old_cache_files
+
 # Add parent directory to path to import merge_videos and merge_video_audio
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from merge_videos import merge_videos_with_trims
@@ -26,6 +29,12 @@ video_processor = VideoProcessor(TEMP_FOLDER, OUTPUT_FOLDER)
 
 # Store batch status
 batch_status = {}
+
+# Clean up old cache files on startup
+if ENABLE_CACHING:
+    logging.info("Cleaning up old cache files...")
+    cleanup_old_cache_files()
+    logging.info("Cache cleanup completed")
 
 @app.route('/')
 def index():
@@ -376,6 +385,146 @@ def download_file(batch_id, filename):
         return jsonify({'error': 'File not found'}), 404
     
     return send_file(file_path, as_attachment=True, download_name=filename)
+
+@app.route('/api/clear-cache', methods=['POST'])
+def clear_cache():
+    """Clear video cache to free up disk space."""
+    try:
+        from merge_videos import cleanup_old_cache_files
+        import shutil
+        
+        # Force clean all cache files
+        cache_folder = VIDEO_CACHE_FOLDER
+        if os.path.exists(cache_folder):
+            shutil.rmtree(cache_folder)
+            os.makedirs(cache_folder, exist_ok=True)
+            
+        return jsonify({'success': True, 'message': 'Cache cleared successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system-info', methods=['GET'])
+def get_system_info():
+    """Get system information for monitoring."""
+    try:
+        import psutil
+        
+        # Get CPU and memory usage
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        # Get cache information
+        cache_size = 0
+        cache_folder = VIDEO_CACHE_FOLDER
+        if os.path.exists(cache_folder):
+            for dirpath, dirnames, filenames in os.walk(cache_folder):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    cache_size += os.path.getsize(fp)
+        
+        return jsonify({
+            'cpu_percent': cpu_percent,
+            'memory_percent': memory.percent,
+            'memory_total': memory.total,
+            'memory_available': memory.available,
+            'disk_percent': disk.percent,
+            'disk_total': disk.total,
+            'disk_free': disk.free,
+            'cache_size': cache_size,
+            'cache_enabled': ENABLE_CACHING,
+            'max_workers': MAX_WORKERS,
+            'video_quality': VIDEO_QUALITY
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/update-settings', methods=['POST'])
+def update_settings():
+    """Update video processing settings."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Update settings
+        global VIDEO_QUALITY, ENABLE_CACHING, MAX_WORKERS
+        
+        if 'video_quality' in data and data['video_quality'] in ['low', 'medium', 'high']:
+            VIDEO_QUALITY = data['video_quality']
+            
+        if 'enable_caching' in data and isinstance(data['enable_caching'], bool):
+            ENABLE_CACHING = data['enable_caching']
+            
+        if 'max_workers' in data and isinstance(data['max_workers'], int):
+            MAX_WORKERS = max(1, min(16, data['max_workers']))
+        
+        return jsonify({
+            'success': True,
+            'message': 'Settings updated successfully',
+            'settings': {
+                'video_quality': VIDEO_QUALITY,
+                'enable_caching': ENABLE_CACHING,
+                'max_workers': MAX_WORKERS
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    """Get application logs for debugging."""
+    try:
+        import tempfile
+        import os
+        
+        # Create a temporary file to store logs
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.log') as temp_file:
+            temp_path = temp_file.name
+        
+        # Redirect logs to the temporary file
+        import logging
+        
+        # Create a new logger for this request
+        logger = logging.getLogger('debug_logger')
+        logger.setLevel(logging.INFO)
+        
+        # Create a file handler
+        file_handler = logging.FileHandler(temp_path)
+        file_handler.setLevel(logging.INFO)
+        
+        # Create a formatter and set it for the handler
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        
+        # Add the handler to the logger
+        logger.addHandler(file_handler)
+        
+        # Log some debug information
+        logger.info(f"Video Quality: {VIDEO_QUALITY}")
+        logger.info(f"Cache Enabled: {ENABLE_CACHING}")
+        logger.info(f"Max Workers: {MAX_WORKERS}")
+        logger.info(f"Video Codec: {VIDEO_CODEC}")
+        logger.info(f"Video Preset: {VIDEO_PRESET}")
+        logger.info(f"Target FPS: {TARGET_FPS}")
+        logger.info(f"Target Height: {TARGET_HEIGHT}")
+        logger.info(f"Video Bitrate: {VIDEO_BITRATE}")
+        logger.info(f"CRF Value: {CRF_VALUE}")
+        
+        # Remove the handler to prevent duplicate logs in future requests
+        logger.removeHandler(file_handler)
+        file_handler.close()
+        
+        # Read the logs from the temporary file
+        with open(temp_path, 'r') as log_file:
+            logs = log_file.read()
+        
+        # Clean up the temporary file
+        os.unlink(temp_path)
+        
+        return jsonify({'logs': logs})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=DEBUG, host='0.0.0.0', port=5001)

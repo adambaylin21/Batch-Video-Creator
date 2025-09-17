@@ -75,7 +75,7 @@ class VideoProcessor:
         return random.sample(videos, count)
     
     def process_batch(self, folder_path, video_count, video_duration, output_count, progress_callback=None, output_folder=None, video_trim_mode='fixed'):
-        """Process batch of videos"""
+        """Process batch of videos with optimized processing"""
         if progress_callback:
             progress_callback(0, "Scanning for videos...")
         
@@ -150,11 +150,11 @@ class VideoProcessor:
                         end_time = start_time + video_duration
                         trims[temp_filename] = {'start': start_time, 'end': end_time}
             
-            # Merge videos
+            # Merge videos with optimized processing
             final_output_path = os.path.join(output_folder, f"output_{i+1}_{uuid.uuid4()}.mp4")
             try:
                 if progress_callback:
-                    progress_callback(overall_progress, "Merging videos...")
+                    progress_callback(overall_progress, "Merging videos with optimized processing...")
                 
                 # The merge_videos_with_trims function creates a file named 'merged.mp4'
                 merge_videos_with_trims(files, trims, batch_folder, output_folder)

@@ -23,6 +23,76 @@
                 <button class="tab-btn" data-tab="voice-adder">Voice Adder</button>
             </div>
             
+            <!-- Settings Panel -->
+            <div class="settings-panel" id="settings-panel">
+                <div class="card">
+                    <h2><i class="fas fa-cog"></i> Settings</h2>
+                    <div class="form-group">
+                        <label for="video-quality">Video Quality</label>
+                        <select id="video-quality" class="form-select">
+                            <option value="low">Low (Smaller file size)</option>
+                            <option value="medium" selected>Medium (Balanced)</option>
+                            <option value="high">High (Better quality)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="enable-caching">
+                            <input type="checkbox" id="enable-caching" checked> Enable Video Caching
+                        </label>
+                        <small>Cache processed videos for faster future processing</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="max-workers">Max Workers</label>
+                        <input type="number" id="max-workers" min="1" max="16" value="4">
+                        <small>Number of parallel processing threads (1-16)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="skip-audio">
+                            <input type="checkbox" id="skip-audio" checked> Skip Audio Processing
+                        </label>
+                        <small>Disable audio processing for faster video merging</small>
+                    </div>
+                    <div class="form-actions">
+                        <button id="save-settings"><i class="fas fa-save"></i> Save Settings</button>
+                        <button id="clear-cache"><i class="fas fa-trash"></i> Clear Cache</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2><i class="fas fa-info-circle"></i> System Information</h2>
+                    <div class="system-info">
+                        <div class="info-item">
+                            <span class="info-label">CPU Usage:</span>
+                            <span class="info-value" id="cpu-usage">0%</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Memory Usage:</span>
+                            <span class="info-value" id="memory-usage">0%</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Disk Usage:</span>
+                            <span class="info-value" id="disk-usage">0%</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Cache Size:</span>
+                            <span class="info-value" id="cache-size">0 MB</span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button id="refresh-system-info"><i class="fas fa-sync"></i> Refresh</button>
+                    </div>
+                </div>
+                
+                <div class="close-settings" id="close-settings">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            
+            <!-- Settings Button -->
+            <div class="settings-button" id="settings-button">
+                <i class="fas fa-cog"></i>
+            </div>
+            
             <!-- Tab Content -->
             <div class="tab-content">
                 <!-- Batch Creator Tab -->
