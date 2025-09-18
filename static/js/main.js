@@ -86,6 +86,30 @@ const voiceStatusMessage = document.getElementById('voice-status-message');
 const voiceResultsSection = document.getElementById('voice-results-section');
 const voiceDownloadLink = document.getElementById('voice-download-link');
 
+// Voice Adder Batch Mode elements
+const voiceModeSingle = document.getElementById('voice-mode-single');
+const voiceModeBatch = document.getElementById('voice-mode-batch');
+const voiceSingleSection = document.getElementById('voice-single-section');
+const voiceBatchSection = document.getElementById('voice-batch-section');
+const scanVoiceBatchBtn = document.getElementById('scan-voice-batch-btn');
+const voiceVideoFolderPathInput = document.getElementById('voice-video-folder-path');
+const voiceAudioFolderPathInput = document.getElementById('voice-audio-folder-path');
+const voiceOutputBatchFolderPathInput = document.getElementById('voice-output-batch-folder-path');
+const voiceBatchOriginalAudioVolumeInput = document.getElementById('voice-batch-original-audio-volume');
+const voiceBatchVolumeValueSpan = document.getElementById('voice-batch-volume-value');
+const voiceBatchFileListSection = document.getElementById('voice-batch-file-list-section');
+const voiceVideoCountBatch = document.getElementById('voice-video-count-batch');
+const voiceAudioCountBatch = document.getElementById('voice-audio-count-batch');
+const voiceVideoListBatch = document.getElementById('voice-video-list-batch');
+const voiceAudioListBatch = document.getElementById('voice-audio-list-batch');
+const processVoiceBatchBtn = document.getElementById('process-voice-batch-btn');
+const voiceBatchProgressSection = document.getElementById('voice-batch-progress-section');
+const voiceBatchProgressFill = document.querySelector('.progress-fill-voice-batch');
+const voiceBatchProgressText = document.querySelector('.progress-text-voice-batch');
+const voiceBatchStatusMessage = document.getElementById('voice-batch-status-message');
+const voiceBatchResultsSection = document.getElementById('voice-batch-results-section');
+const voiceBatchDownloadLinks = document.getElementById('voice-batch-download-links');
+
 // Event Listeners
 // Tab switching
 tabBtns.forEach(btn => {
@@ -157,6 +181,13 @@ voiceVideoFileInput.addEventListener('change', handleVideoFileSelect);
 voiceAudioFileInput.addEventListener('change', handleAudioFileSelect);
 originalAudioVolumeInput.addEventListener('input', updateVolumeValue);
 processVoiceBtn.addEventListener('click', startVoiceProcessing);
+
+// Voice Adder Batch Mode event listeners
+voiceModeSingle.addEventListener('change', handleVoiceModeChange);
+voiceModeBatch.addEventListener('change', handleVoiceModeChange);
+scanVoiceBatchBtn.addEventListener('click', scanVoiceBatchFolders);
+voiceBatchOriginalAudioVolumeInput.addEventListener('input', updateVoiceBatchVolumeValue);
+processVoiceBatchBtn.addEventListener('click', startVoiceBatchProcessing);
 
 // Functions
 async function browseInputFolder() {
@@ -1101,6 +1132,233 @@ function showVoiceResult(filename) {
     `;
     
     voiceResultsSection.classList.remove('hidden');
+}
+
+// Voice Adder Batch Mode Functions
+function handleVoiceModeChange() {
+    if (voiceModeSingle.checked) {
+        voiceSingleSection.classList.remove('hidden');
+        voiceBatchSection.classList.add('hidden');
+    } else {
+        voiceSingleSection.classList.add('hidden');
+        voiceBatchSection.classList.remove('hidden');
+    }
+}
+
+function updateVoiceBatchVolumeValue() {
+    voiceBatchVolumeValueSpan.textContent = `${voiceBatchOriginalAudioVolumeInput.value}%`;
+}
+
+async function scanVoiceBatchFolders() {
+    const videoFolderPath = voiceVideoFolderPathInput.value.trim();
+    const audioFolderPath = voiceAudioFolderPathInput.value.trim();
+    
+    if (!videoFolderPath) {
+        alert('Please enter a video folder path');
+        return;
+    }
+    
+    if (!audioFolderPath) {
+        alert('Please enter an audio folder path');
+        return;
+    }
+    
+    scanVoiceBatchBtn.disabled = true;
+    scanVoiceBatchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+    
+    try {
+        // Scan video folder
+        const videoResponse = await fetch(`${API_BASE}/api/scan-folder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ folder_path: videoFolderPath }),
+        });
+        
+        // Scan audio folder
+        const audioResponse = await fetch(`${API_BASE}/api/scan-audio-folder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ folder_path: audioFolderPath }),
+        });
+        
+        const videoData = await videoResponse.json();
+        const audioData = await audioResponse.json();
+        
+        if (videoResponse.ok && audioResponse.ok) {
+            displayVoiceBatchFiles(videoData.videos, audioData.audios);
+            showVoiceBatchProcessSection();
+        } else {
+            alert('Error: ' + (videoData.error || audioData.error));
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+    } finally {
+        scanVoiceBatchBtn.disabled = false;
+        scanVoiceBatchBtn.innerHTML = '<i class="fas fa-search"></i> Scan Folders';
+    }
+}
+
+function displayVoiceBatchFiles(videos, audios) {
+    const minCount = Math.min(videos.length, audios.length);
+    
+    voiceVideoCountBatch.innerHTML = `Found ${videos.length} videos <span class="file-count-badge">${minCount} will be processed</span>`;
+    voiceAudioCountBatch.innerHTML = `Found ${audios.length} audio files <span class="file-count-badge">${minCount} will be processed</span>`;
+    
+    // Display videos with indicators for which ones will be processed
+    voiceVideoListBatch.innerHTML = videos.map((video, index) => `
+        <div class="file-item ${index < minCount ? 'will-process' : 'will-skip'}">
+            <i class="fas fa-file-video"></i>
+            <div class="file-info">
+                <h4>${video.name}</h4>
+                <p>Duration: ${formatDuration(video.duration)}</p>
+            </div>
+            ${index >= minCount ? '<span class="skip-badge">Skip</span>' : ''}
+        </div>
+    `).join('');
+    
+    // Display audio files with indicators for which ones will be processed
+    voiceAudioListBatch.innerHTML = audios.map((audio, index) => `
+        <div class="file-item ${index < minCount ? 'will-process' : 'will-skip'}">
+            <i class="fas fa-file-audio"></i>
+            <div class="file-info">
+                <h4>${audio.name}</h4>
+                <p>Duration: ${formatDuration(audio.duration)}</p>
+            </div>
+            ${index >= minCount ? '<span class="skip-badge">Skip</span>' : ''}
+        </div>
+    `).join('');
+    
+    voiceBatchFileListSection.classList.remove('hidden');
+}
+
+function showVoiceBatchProcessSection() {
+    // Show the process button
+    processVoiceBatchBtn.style.display = 'block';
+}
+
+async function startVoiceBatchProcessing() {
+    const videoFolderPath = voiceVideoFolderPathInput.value.trim();
+    const audioFolderPath = voiceAudioFolderPathInput.value.trim();
+    const outputFolderPath = voiceOutputBatchFolderPathInput.value.trim();
+    const originalAudioVolume = parseInt(voiceBatchOriginalAudioVolumeInput.value);
+    
+    if (!videoFolderPath) {
+        alert('Please select a video folder first');
+        return;
+    }
+    
+    if (!audioFolderPath) {
+        alert('Please select an audio folder first');
+        return;
+    }
+    
+    if (!outputFolderPath) {
+        alert('Please select an output folder first');
+        return;
+    }
+    
+    processVoiceBatchBtn.disabled = true;
+    processVoiceBatchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    showVoiceBatchProgressSection();
+    updateVoiceBatchProgress(0, 'Starting batch processing...');
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/process-voice-batch`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                video_folder_path: videoFolderPath,
+                audio_folder_path: audioFolderPath,
+                output_folder_path: outputFolderPath,
+                original_audio_volume: originalAudioVolume,
+            }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentVoiceBatchId = data.batch_id;
+            pollVoiceBatchStatus();
+        } else {
+            alert('Error: ' + data.error);
+            hideVoiceBatchProgressSection();
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+        hideVoiceBatchProgressSection();
+    } finally {
+        processVoiceBatchBtn.disabled = false;
+        processVoiceBatchBtn.innerHTML = '<i class="fas fa-play"></i> Start Batch Processing';
+    }
+}
+
+function showVoiceBatchProgressSection() {
+    voiceBatchProgressSection.classList.remove('hidden');
+    voiceBatchResultsSection.classList.add('hidden');
+}
+
+function hideVoiceBatchProgressSection() {
+    voiceBatchProgressSection.classList.add('hidden');
+}
+
+function updateVoiceBatchProgress(percent, message) {
+    voiceBatchProgressFill.style.width = `${percent}%`;
+    voiceBatchProgressText.textContent = `${percent}%`;
+    voiceBatchStatusMessage.textContent = message;
+}
+
+async function pollVoiceBatchStatus() {
+    if (voiceStatusInterval) {
+        clearInterval(voiceStatusInterval);
+    }
+    
+    voiceStatusInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/status/${currentVoiceBatchId}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                updateVoiceBatchProgress(data.progress || 0, data.message || data.status);
+                
+                if (data.status === 'completed') {
+                    clearInterval(voiceStatusInterval);
+                    showVoiceBatchResults(data.outputs);
+                } else if (data.status === 'error') {
+                    clearInterval(voiceStatusInterval);
+                    alert('Processing error: ' + data.error);
+                    hideVoiceBatchProgressSection();
+                }
+            } else {
+                clearInterval(voiceStatusInterval);
+                alert('Status error: ' + data.error);
+                hideVoiceBatchProgressSection();
+            }
+        } catch (error) {
+            clearInterval(voiceStatusInterval);
+            alert('Network error: ' + error.message);
+            hideVoiceBatchProgressSection();
+        }
+    }, 2000);
+}
+
+function showVoiceBatchResults(outputs) {
+    voiceBatchDownloadLinks.innerHTML = outputs.map(filename => `
+        <div class="download-item">
+            <a href="${API_BASE}/api/download/${currentVoiceBatchId}/${filename}" download>
+                <i class="fas fa-download"></i>
+                ${filename}
+            </a>
+        </div>
+    `).join('');
+    
+    voiceBatchResultsSection.classList.remove('hidden');
 }
 
 // Settings panel functions

@@ -250,19 +250,90 @@
                 
                 <!-- Voice Adder Tab -->
                 <div id="voice-adder" class="tab-pane">
-                    <!-- File Selection -->
+                    <!-- Mode Selection -->
                     <section class="card">
-                        <h2><i class="fas fa-microphone"></i> Select Files</h2>
+                        <h2><i class="fas fa-microphone"></i> Processing Mode</h2>
                         <div class="form-group">
-                            <label for="voice-video-file">Video File</label>
-                            <input type="file" id="voice-video-file" accept="video/mp4">
-                            <small>Select a MP4 video file</small>
+                            <label>Select Processing Mode</label>
+                            <div class="mode-selector">
+                                <label class="mode-option">
+                                    <input type="radio" name="voice-mode" value="single" checked> Single File
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="voice-mode" value="batch"> Batch Processing
+                                </label>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="voice-audio-file">Voice Audio File</label>
-                            <input type="file" id="voice-audio-file" accept="audio/mp3,audio/ogg,audio/wav">
-                            <small>Select a voice audio file (MP3, OGG, or WAV)</small>
+                    </section>
+                    
+                    <!-- Single File Mode Section -->
+                    <div id="voice-single-section">
+                        <!-- File Selection -->
+                        <section class="card">
+                            <h2><i class="fas fa-microphone"></i> Select Files</h2>
+                            <div class="form-group">
+                                <label for="voice-video-file">Video File</label>
+                                <input type="file" id="voice-video-file" accept="video/mp4">
+                                <small>Select a MP4 video file</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="voice-audio-file">Voice Audio File</label>
+                                <input type="file" id="voice-audio-file" accept="audio/mp3,audio/ogg,audio/wav">
+                                <small>Select a voice audio file (MP3, OGG, or WAV)</small>
+                            </div>
+                        </section>
+                    </div>
+                    
+                    <!-- Batch Processing Mode Section -->
+                    <div id="voice-batch-section" class="hidden">
+                        <!-- Folder Selection -->
+                        <section class="card">
+                            <h2><i class="fas fa-microphone"></i> Select Folders</h2>
+                            <div class="form-group">
+                                <label for="voice-video-folder-path">Video Folder Path</label>
+                                <input type="text" id="voice-video-folder-path" placeholder="Example: /Users/username/Videos">
+                                <small>Enter the full path to the folder containing your MP4 videos</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="voice-audio-folder-path">Voice Audio Folder Path</label>
+                                <input type="text" id="voice-audio-folder-path" placeholder="Example: /Users/username/VoiceAudios">
+                                <small>Enter the full path to the folder containing your voice audio files</small>
+                            </div>
+                            <button id="scan-voice-folders-btn"><i class="fas fa-search"></i> Scan Folders</button>
+                        </section>
+                        
+                        <!-- File Lists Section (hidden initially) -->
+                        <div id="voice-batch-file-list-section" class="card hidden">
+                            <h2><i class="fas fa-file"></i> Found Files</h2>
+                            <div id="voice-batch-info" class="info-box">
+                                <h3><i class="fas fa-info-circle"></i> Batch Processing Information</h3>
+                                <ul>
+                                    <li>Videos and audio files will be paired sequentially (first video with first audio, etc.)</li>
+                                    <li>If there are different numbers of files, only the minimum number of pairs will be processed</li>
+                                    <li>The same volume settings will be applied to all videos</li>
+                                </ul>
+                            </div>
+                            <div class="file-counts">
+                                <div id="voice-video-count" class="info"></div>
+                                <div id="voice-audio-count" class="info"></div>
+                                <div id="voice-pairs-count" class="info"></div>
+                            </div>
+                            <div class="file-lists">
+                                <div class="file-list-container">
+                                    <h3>Video Files</h3>
+                                    <div id="voice-video-list" class="file-grid"></div>
+                                </div>
+                                <div class="file-list-container">
+                                    <h3>Voice Audio Files</h3>
+                                    <div id="voice-audio-list" class="file-grid"></div>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                    
+                    <!-- Shared Settings Section -->
+                    <section class="card">
+                        <h2><i class="fas fa-sliders-h"></i> Settings</h2>
                         <div class="form-group">
                             <label for="original-audio-volume">Original Audio Volume</label>
                             <div class="volume-control">
@@ -274,13 +345,13 @@
                         <div class="form-group">
                             <label for="output-folder-path-voice">Output Folder Path</label>
                             <input type="text" id="output-folder-path-voice" placeholder="Example: /Users/username/Desktop/outputs">
-                            <small>Enter the full path where you want to save the output video</small>
+                            <small>Enter the full path where you want to save the output video(s)</small>
                         </div>
                         <button id="process-voice-btn"><i class="fas fa-play"></i> Process Video</button>
                     </section>
                     
-                    <!-- File Info -->
-                    <section id="voice-file-info-section" class="card hidden">
+                    <!-- File Info Section (for single mode) -->
+                    <div id="voice-file-info-section" class="card hidden">
                         <h2><i class="fas fa-info-circle"></i> File Information</h2>
                         <div class="file-info-container">
                             <div class="file-info-item">
@@ -292,10 +363,10 @@
                                 <div id="audio-file-info" class="file-details"></div>
                             </div>
                         </div>
-                    </section>
+                    </div>
                     
-                    <!-- Progress -->
-                    <section id="voice-progress-section" class="card hidden">
+                    <!-- Progress Section -->
+                    <div id="voice-progress-section" class="card hidden">
                         <h2><i class="fas fa-tasks"></i> Processing Status</h2>
                         <div class="progress-container">
                             <div class="progress-bar">
@@ -304,13 +375,13 @@
                             <div class="progress-text-voice">0%</div>
                         </div>
                         <div id="voice-status-message"></div>
-                    </section>
+                    </div>
                     
-                    <!-- Results -->
-                    <section id="voice-results-section" class="card hidden">
-                        <h2><i class="fas fa-download"></i> Download Result</h2>
+                    <!-- Results Section -->
+                    <div id="voice-results-section" class="card hidden">
+                        <h2><i class="fas fa-download"></i> Download Results</h2>
                         <div id="voice-download-link" class="download-container"></div>
-                    </section>
+                    </div>
                 </div>
             </div>
         </main>

@@ -359,6 +359,85 @@ def process_voice_adder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/process-voice-batch', methods=['POST'])
+def process_voice_batch():
+    try:
+        data = request.get_json()
+        if not data or 'video_folder_path' not in data or 'audio_folder_path' not in data:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        video_folder_path = data['video_folder_path']
+        audio_folder_path = data['audio_folder_path']
+        output_folder_path = data.get('output_folder_path', OUTPUT_FOLDER)
+        original_audio_volume = data.get('original_audio_volume', 30)
+        
+        # Validate folder paths
+        if not os.path.exists(video_folder_path):
+            return jsonify({'error': 'Video folder does not exist'}), 400
+        
+        if not os.path.exists(audio_folder_path):
+            return jsonify({'error': 'Audio folder does not exist'}), 400
+        
+        # Validate output folder path
+        if not os.path.exists(output_folder_path):
+            os.makedirs(output_folder_path, exist_ok=True)
+        
+        # Validate volume parameter
+        try:
+            original_audio_volume = int(original_audio_volume)
+            if original_audio_volume < 0 or original_audio_volume > 100:
+                return jsonify({'error': 'Original audio volume must be between 0 and 100'}), 400
+        except ValueError:
+            return jsonify({'error': 'Invalid original audio volume value'}), 400
+        
+        # Create batch ID
+        batch_id = str(uuid.uuid4())
+        
+        # Initialize batch status
+        batch_status[batch_id] = {
+            'status': 'processing',
+            'progress': 0,
+            'outputs': [],
+            'error': None,
+            'output_folder_path': output_folder_path
+        }
+        
+        # Start processing in background
+        def process():
+            try:
+                # Create a callback function to update progress
+                def progress_callback(progress, message=None):
+                    batch_status[batch_id]['progress'] = progress
+                    if message:
+                        batch_status[batch_id]['message'] = message
+                
+                outputs = video_processor.process_voice_batch(
+                    video_folder_path, audio_folder_path, output_folder_path,
+                    progress_callback, original_audio_volume
+                )
+                
+                batch_status[batch_id].update({
+                    'status': 'completed',
+                    'progress': 100,
+                    'message': 'Processing completed',
+                    'outputs': outputs
+                })
+            except Exception as e:
+                batch_status[batch_id].update({
+                    'status': 'error',
+                    'progress': 0,
+                    'error': str(e),
+                    'message': f'Error: {str(e)}'
+                })
+        
+        thread = threading.Thread(target=process)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({'batch_id': batch_id, 'message': 'Batch processing started'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/status/<batch_id>')
 def get_status(batch_id):
     if batch_id not in batch_status:

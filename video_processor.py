@@ -295,3 +295,68 @@ class VideoProcessor:
         except Exception as e:
             logging.error(f"Error processing video with voice: {e}")
             raise
+    
+    def process_voice_batch(self, video_folder_path, audio_folder_path, output_folder, progress_callback=None, original_audio_volume=30):
+        """Process batch of videos with voice audio addition"""
+        if progress_callback:
+            progress_callback(0, "Scanning for videos and audio files...")
+        
+        # Ensure output folder exists
+        os.makedirs(output_folder, exist_ok=True)
+        
+        # Scan all videos and audio files
+        all_videos = self.scan_folder(video_folder_path)
+        all_audios = self.scan_audio_folder(audio_folder_path)
+        
+        if not all_videos:
+            raise ValueError("No videos found in the specified folder")
+        
+        if not all_audios:
+            raise ValueError("No audio files found in the specified folder")
+        
+        # Determine the number of pairs to process (minimum of videos and audios)
+        num_pairs = min(len(all_videos), len(all_audios))
+        
+        if progress_callback:
+            progress_callback(5, f"Found {len(all_videos)} videos and {len(all_audios)} audio files. Will process {num_pairs} pairs.")
+        
+        outputs = []
+        
+        # Import here to avoid issues if module not available
+        from merge_video_audio import merge_video_with_voice
+        
+        for i in range(num_pairs):
+            # Calculate overall progress
+            overall_progress = 5 + (i / num_pairs) * 90  # 5% to 95%
+            
+            video = all_videos[i]
+            audio = all_audios[i]
+            
+            if progress_callback:
+                progress_callback(overall_progress, f"Processing video {i+1} of {num_pairs}: {video['name']} with {audio['name']}...")
+            
+            try:
+                # Process video with voice audio
+                output_path = merge_video_with_voice(
+                    video['path'], audio['path'], output_folder,
+                    lambda p, msg=None: progress_callback(overall_progress + (p/num_pairs), msg),
+                    original_audio_volume
+                )
+                
+                if progress_callback:
+                    progress_callback(overall_progress + (100/num_pairs), f"Completed: {video['name']} with {audio['name']}")
+                
+                # Add output filename to results
+                output_filename = os.path.basename(output_path)
+                outputs.append(output_filename)
+                
+            except Exception as e:
+                logging.error(f"Error processing {video['name']} with {audio['name']}: {e}")
+                if progress_callback:
+                    progress_callback(overall_progress, f"Error processing {video['name']}: {str(e)}")
+                continue
+        
+        if progress_callback:
+            progress_callback(100, f"Batch processing completed! Processed {len(outputs)} of {num_pairs} pairs.")
+        
+        return outputs
